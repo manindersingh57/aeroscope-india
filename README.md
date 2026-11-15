@@ -107,3 +107,14 @@ The outputs describe historical aerosol optical depth during **2022-08-23 to 202
 ## Map API extension
 
 See `backend/MAP_API_GUIDE.md` for new `/api/v1/map/layers` and `/api/v1/map/hotspots/<model>` routes and the fail-closed production release safeguard.
+
+
+## Phase 6: Production-readiness and React contract
+
+- `GET /api/v1/openapi.json` serves a complete OpenAPI endpoint catalogue.
+- `GET /api/v1/capabilities` exposes non-sensitive readiness and feature flags.
+- All `/api/*` responses include `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and `X-Content-Type-Options: nosniff`.
+- **Fail-closed environment default:** a service without `AEROSCOPE_ENV` runs in `production` mode and restricts research results unless explicitly approved. Local Flask work requires `.env` with `AEROSCOPE_ENV=development`.
+- `backend/FRONTEND_API_CONTRACT.md` provides a React client example and error-handling guidance.
+
+To test locally, start in `backend/` and run `python -m pytest -q`, then `python -m flask --app wsgi run --debug` in a separate terminal. Do not upload local `data/` or analytics archives to GitHub or a public hosting service until the relevant MOSDAC redistribution rights are confirmed.

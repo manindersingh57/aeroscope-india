@@ -23,9 +23,20 @@ def create_app(test_config=None, service=None):
     app = Flask(__name__)
     app.json.ensure_ascii = False
 
-    origins_raw = os.getenv("AEROSCOPE_ALLOWED_ORIGINS", "http://localhost:5173")
+    # Default to production when no explicit environment is provided, so a
+    # newly hosted service cannot accidentally expose research results.
+    # Unit tests may run in development without a local .env file.
+    environment = os.getenv("AEROSCOPE_ENV")
+    if environment is None:
+        environment = "development" if test_config and test_config.get("TESTING") else "production"
+    environment = environment.lower().strip()
+    if environment not in {"development", "production", "test"}:
+        raise ValueError("AEROSCOPE_ENV must be development, production, or test")
+
+    origins_raw = os.getenv("AEROSCOPE_ALLOWED_ORIGINS")
+    if origins_raw is None:
+        origins_raw = "http://localhost:5173" if environment != "production" else ""
     origins = [s.strip().rstrip("/") for s in origins_raw.split(",") if s.strip()]
-    environment = os.getenv("AEROSCOPE_ENV", "development").lower()
     app.config.update(
         ENVIRONMENT=environment,
         ANALYTICS_DIR=str(Path(os.getenv("AEROSCOPE_PACKAGE_DIR", str(backend_root))).resolve()),
@@ -78,7 +89,9 @@ def create_app(test_config=None, service=None):
             "/api/v1/hotspots", "/api/v1/map/grid", "/api/v1/map/hotspots",
         )
         path = request.path.rstrip("/")
-        if any(path == prefix or path.startswith(prefix + "/") for prefix in protected):
+        if (any(path == prefix or path.startswith(prefix + "/") for prefix in protected)
+                or path.startswith("/api/v1/models/model_a/")
+                or path.startswith("/api/v1/models/model_b/")):
             from .errors import APIError
             raise APIError(
                 "Public research results are disabled pending data-policy review",
@@ -87,9 +100,22 @@ def create_app(test_config=None, service=None):
             )
         return None
 
+    # HTTP defaults appropriate for a research API. Headers apply equally to
+    # successful results and JSON error responses. Avoid browser/proxy caching
+    # of potentially sensitive research outputs.
+    @app.after_request
+    def apply_response_security_headers(response):
+        if request.path.startswith("/api/"):
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["Referrer-Policy"] = "no-referrer"
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     register_error_handlers(app)
     from .routes.api import api
     app.register_blueprint(api, url_prefix="/api/v1")
     from .routes.maps import maps_api
     app.register_blueprint(maps_api, url_prefix="/api/v1/map")
+    from .routes.analytics import analytics_api
+    app.register_blueprint(analytics_api, url_prefix="/api/v1/models")
     return app

@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, send_file
 
 from ..errors import APIError
 from ..validation import integer_arg, number_arg, validate_model
@@ -27,6 +27,28 @@ def ready():
     if current_app.extensions.get("aeroscope_service") is None:
         raise APIError("Research data not installed or not ready", 503, "service_unavailable")
     return jsonify({"status": "ready", "research_data_loaded": True})
+
+
+@api.get("/capabilities")
+def capabilities():
+    """Read-only availability information; does not reveal research measurements."""
+    released = (current_app.config["ENVIRONMENT"] != "production"
+                or current_app.config["PUBLIC_RESULTS_ENABLED"])
+    return jsonify({
+        "api_version": "v1",
+        "research_data_loaded": current_app.extensions.get("aeroscope_service") is not None,
+        "research_results_available": released,
+        "grid_points_available": released and current_app.config["ENABLE_GRID_API"],
+        "historical_data_only": True,
+        "documentation": "/api/v1/openapi.json",
+    })
+
+
+@api.get("/openapi.json")
+def openapi():
+    """Machine-readable OpenAPI contract for the React frontend."""
+    spec = Path(__file__).resolve().parents[2] / "docs" / "openapi.json"
+    return send_file(spec, mimetype="application/json")
 
 
 @api.get("/overview")
