@@ -1,0 +1,16 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+# Data files are NOT automatically approved for public redistribution.
+backend/data/*.parquet
+backend/data/*.json
+backend/data/hotspots/*.csv
+backend/config/backend_config.json
+*.zip
+*.ipynb_checkpoints/
