@@ -24,7 +24,10 @@ class FakeService:
     def get_largest_hotspots(self, model, limit):
         return [{"region_id": 435}][:limit]
     def get_hotspots(self, model, **kwargs):
-        return [{"region_id": 435, "model": model}, {"region_id": 436, "model": model}]
+        return [
+            {"region_id": 435, "model": model, "center": {"latitude": 30.9, "longitude": 75.9}, "bounds": {"south": 30.8, "north": 31.0, "west": 75.8, "east": 76.0}, "states": ["Punjab"], "grid_cells": 25},
+            {"region_id": 436, "model": model, "center": {"latitude": 29.9, "longitude": 75.2}, "bounds": {"south": 29.8, "north": 30.0, "west": 75.1, "east": 75.3}, "states": ["Haryana"], "grid_cells": 12},
+        ]
     def get_hotspot(self, model, region_id):
         return {"region_id": region_id} if region_id == 435 else None
 

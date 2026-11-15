@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 
 from .errors import register_error_handlers
@@ -31,6 +31,7 @@ def create_app(test_config=None, service=None):
         ANALYTICS_DIR=str(Path(os.getenv("AEROSCOPE_PACKAGE_DIR", str(backend_root))).resolve()),
         ALLOWED_ORIGINS=origins,
         ENABLE_GRID_API=os.getenv("AEROSCOPE_ENABLE_GRID_API", "false").lower() == "true",
+        PUBLIC_RESULTS_ENABLED=os.getenv("AEROSCOPE_PUBLIC_RESULTS_ENABLED", "false").lower() == "true",
         MAX_CONTENT_LENGTH=32 * 1024,
     )
     if test_config:
@@ -63,7 +64,32 @@ def create_app(test_config=None, service=None):
                 app.extensions["aeroscope_load_error"] = type(err).__name__
                 app.logger.exception("Failed loading analytical service")
 
+    # Fail closed for all research-result endpoints on public hosting until
+    # redistribution permissions have been reviewed and explicitly approved.
+    @app.before_request
+    def enforce_public_results_policy():
+        if request.method == "OPTIONS":
+            return None  # Preserve CORS preflight handling.
+        if app.config["ENVIRONMENT"] != "production" or app.config["PUBLIC_RESULTS_ENABLED"]:
+            return None
+        protected = (
+            "/api/v1/overview", "/api/v1/dashboard", "/api/v1/location",
+            "/api/v1/states", "/api/v1/state-summaries", "/api/v1/compare/states",
+            "/api/v1/hotspots", "/api/v1/map/grid", "/api/v1/map/hotspots",
+        )
+        path = request.path.rstrip("/")
+        if any(path == prefix or path.startswith(prefix + "/") for prefix in protected):
+            from .errors import APIError
+            raise APIError(
+                "Public research results are disabled pending data-policy review",
+                403,
+                "public_results_disabled",
+            )
+        return None
+
     register_error_handlers(app)
     from .routes.api import api
     app.register_blueprint(api, url_prefix="/api/v1")
+    from .routes.maps import maps_api
+    app.register_blueprint(maps_api, url_prefix="/api/v1/map")
     return app

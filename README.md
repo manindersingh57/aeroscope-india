@@ -102,3 +102,8 @@ Start with **one worker** because each worker loads the dataset in memory. Bench
 ## Scientific and ethics notes
 
 The outputs describe historical aerosol optical depth during **2022-08-23 to 2024-06-05**, not live AQI, ground-level PM2.5, forecasts, or causal source attribution. Geographic and seasonal missingness affect representativeness. Membership strength is not a calibrated probability. Review data-usage rights and attribution before publishing exported features.
+
+
+## Map API extension
+
+See `backend/MAP_API_GUIDE.md` for new `/api/v1/map/layers` and `/api/v1/map/hotspots/<model>` routes and the fail-closed production release safeguard.
