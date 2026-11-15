@@ -14,3 +14,6 @@ backend/data/hotspots/*.csv
 backend/config/backend_config.json
 *.zip
 *.ipynb_checkpoints/
+
+# Project-specific derived research summaries require permission review before publication.
+backend/data/analytics/

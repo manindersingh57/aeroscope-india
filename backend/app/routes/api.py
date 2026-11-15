@@ -44,11 +44,17 @@ def capabilities():
     })
 
 
+
 @api.get("/openapi.json")
 def openapi():
     """Machine-readable OpenAPI contract for the React frontend."""
     spec = Path(__file__).resolve().parents[2] / "docs" / "openapi.json"
-    return send_file(spec, mimetype="application/json")
+
+    return current_app.response_class(
+        spec.read_bytes(),
+        mimetype="application/json"
+    )
+
 
 
 @api.get("/overview")

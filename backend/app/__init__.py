@@ -58,6 +58,9 @@ def create_app(test_config=None, service=None):
     CORS(app, resources={r"/api/*": {"origins": app.config["ALLOWED_ORIGINS"]}},
          supports_credentials=False, methods=["GET", "POST", "OPTIONS"])
 
+    from .performance import install_performance
+    install_performance(app)
+
     app.extensions["aeroscope_service"] = service
     app.extensions["aeroscope_load_error"] = None
 
