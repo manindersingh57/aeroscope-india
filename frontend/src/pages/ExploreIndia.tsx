@@ -147,6 +147,8 @@ export default function ExploreIndia() {
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><Activity size={15} /> Historical AOD, not live AQI</span>
+            <Link to="/hotspots" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Browse hotspots</Link>
+            <Link to="/models" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory</Link>
             <Link to="/compare" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states</Link>
             <Link to="/" className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-50"><ArrowLeft size={16}/> Home</Link>
           </div>

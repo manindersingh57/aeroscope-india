@@ -12,7 +12,7 @@ const futureModules = [
   { number: '01', name: 'Explore India', detail: 'Model layers and regional patterns' },
   { number: '02', name: 'Location Intelligence', detail: 'Historical grid-cell profiles' },
   { number: '03', name: 'Compare States', detail: 'Regional aerosol comparison' },
-  { number: '04', name: 'Hotspot Explorer', detail: 'Historical hotspot-centre mapping' },
+  { number: '04', name: 'Hotspot Explorer', detail: 'Browse historical aerosol-pattern regions' },
   { number: '05', name: 'Model Laboratory', detail: 'K-Means metrics and PCA summaries' },
 ]
 
@@ -60,7 +60,7 @@ export default function App() {
               <div className="text-xs tracking-[0.17em] text-slate-500">SATELLITE RESEARCH PLATFORM</div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3"><Link to="/compare" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link><Link to="/explore" className="rounded-full bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1b5360]">Explore India Atlas →</Link><div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-center gap-3"><Link to="/models" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory →</Link><Link to="/hotspots" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Hotspot Explorer →</Link><Link to="/compare" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link><Link to="/explore" className="rounded-full bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1b5360]">Explore India Atlas →</Link><div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm">
             <span aria-hidden="true" className={`size-2 rounded-full ${apiConnected ? 'bg-emerald-500' : connection.state === 'loading' ? 'bg-amber-400' : 'bg-rose-500'}`} />
             {connection.state === 'loading' ? 'Checking Flask connection' : apiConnected ? 'Flask API connected' : 'Backend unavailable'}
           </div></div>
@@ -127,10 +127,10 @@ export default function App() {
 
         <section aria-labelledby="modules-heading" className="mt-14">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 id="modules-heading" className="text-2xl font-semibold tracking-tight">Planned exploration modules</h2>
-            <p className="text-sm text-slate-500">Explore the atlas and compare historical state-level AOD patterns</p>
+            <h2 id="modules-heading" className="text-2xl font-semibold tracking-tight">Explore AeroScope modules</h2>
+            <p className="text-sm text-slate-500">Atlas, state comparison, and historical hotspot region exploration</p>
           </div>
-          <div className="mt-4 flex flex-wrap gap-3"><Link to="/explore" className="inline-block rounded-full bg-teal-800 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700">Open interactive atlas →</Link><Link to="/compare" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link></div>
+          <div className="mt-4 flex flex-wrap gap-3"><Link to="/explore" className="inline-block rounded-full bg-teal-800 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700">Open interactive atlas →</Link><Link to="/hotspots" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Browse hotspots →</Link><Link to="/models" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory →</Link><Link to="/compare" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link></div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {futureModules.map((module) => (
               <article key={module.number} className="min-h-36 rounded-2xl border border-slate-200 bg-white p-5">

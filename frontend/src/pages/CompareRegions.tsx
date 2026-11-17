@@ -140,6 +140,8 @@ export default function CompareRegions() {
             <div><div className="text-lg font-bold tracking-tight">AeroScope <span className="text-[#1f8979]">India</span></div><div className="text-[10px] tracking-[0.19em] text-slate-500">SATELLITE RESEARCH PLATFORM</div></div>
           </Link>
           <nav className="flex flex-wrap items-center gap-2 text-sm">
+            <Link to="/models" className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory</Link>
+            <Link to="/hotspots" className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">Hotspot explorer</Link>
             <Link to="/explore" className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">Explore atlas <ArrowRight size={15}/></Link>
             <Link to="/" className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50"><ArrowLeft size={15}/> Home</Link>
           </nav>
