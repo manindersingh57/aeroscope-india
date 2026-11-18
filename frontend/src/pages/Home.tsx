@@ -1,6 +1,11 @@
-import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import StateCard from '../components/StateCard'
+import { Link } from 'react-router-dom'
+import {
+  Activity, ArrowRight, ArrowUpRight, BookOpenText, CheckCircle2,
+  ChevronRight, CircleAlert, FlaskConical, Layers3, MapPinned,
+  Radar, RefreshCw, ScanSearch, ShieldCheck, Wind,
+} from 'lucide-react'
+import OrbitalScene from '../components/OrbitalScene'
 import { aeroscopeApi, API_BASE, type Capabilities, type Health } from '../lib/aeroscopeApi'
 
 type Connection =
@@ -8,144 +13,115 @@ type Connection =
   | { state: 'error'; message: string }
   | { state: 'connected'; health: Health; capabilities: Capabilities }
 
-const futureModules = [
-  { number: '01', name: 'Explore India', detail: 'Model layers and regional patterns' },
-  { number: '02', name: 'Location Intelligence', detail: 'Historical grid-cell profiles' },
-  { number: '03', name: 'Compare States', detail: 'Regional aerosol comparison' },
-  { number: '04', name: 'Hotspot Explorer', detail: 'Browse historical aerosol-pattern regions' },
-  { number: '05', name: 'Model Laboratory', detail: 'K-Means metrics and PCA summaries' },
+const modules = [
+  { path: '/explore', number: '01', name: 'India Atlas', subtitle: 'Explore the geography', description: 'Investigate historical aerosol hotspots, layers, and grid-cell characteristics.', icon: MapPinned, tone: 'aqua' },
+  { path: '/compare', number: '02', name: 'Regional Comparison', subtitle: 'Find the contrasts', description: 'Compare Indian states through seasonality, AOD statistics and coverage.', icon: Activity, tone: 'amber' },
+  { path: '/hotspots', number: '03', name: 'Hotspot Explorer', subtitle: 'Examine the clusters', description: 'Filter and investigate elevated-loading regions identified in the analysis.', icon: ScanSearch, tone: 'mint' },
+  { path: '/models', number: '04', name: 'Model Laboratory', subtitle: 'Inspect the evidence', description: 'Examine K-Means metrics, profiles, algorithm comparisons and PCA.', icon: FlaskConical, tone: 'violet' },
+  { path: '/research', number: '05', name: 'Research Notes', subtitle: 'Understand the method', description: 'Explore data provenance, scientific assumptions, limitations and reproducibility.', icon: BookOpenText, tone: 'coral' },
 ]
 
-export default function App() {
+export default function Home() {
   const [connection, setConnection] = useState<Connection>({ state: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-    let active = true
     setConnection({ state: 'loading' })
-
-    Promise.all([
-      aeroscopeApi.health(controller.signal),
-      aeroscopeApi.capabilities(controller.signal),
-    ])
+    Promise.all([aeroscopeApi.health(controller.signal), aeroscopeApi.capabilities(controller.signal)])
       .then(([health, capabilities]) => {
-        if (active) setConnection({ state: 'connected', health, capabilities })
+        if (!controller.signal.aborted) setConnection({ state: 'connected', health, capabilities })
       })
       .catch((error: unknown) => {
-        if (!active) return
-        setConnection({
-          state: 'error',
-          message: error instanceof Error ? error.message : 'Unable to connect to Flask',
+        if (!controller.signal.aborted) setConnection({
+          state: 'error', message: error instanceof Error ? error.message : 'Unable to reach the Flask API',
         })
       })
-
-    return () => {
-      active = false
-      controller.abort()
-    }
+    return () => controller.abort()
   }, [attempt])
 
   const capabilities = connection.state === 'connected' ? connection.capabilities : null
-  const apiConnected = connection.state === 'connected'
 
   return (
-    <div className="min-h-screen bg-[#f5f7f8] text-[#122b36]">
-      <header className="border-b border-slate-200 bg-white/95">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <span aria-hidden="true" className="grid size-10 place-items-center rounded-xl bg-[#123d48] text-xl text-white">◎</span>
-            <div>
-              <div className="text-lg font-bold tracking-tight">AeroScope <span className="text-[#1f8979]">India</span></div>
-              <div className="text-xs tracking-[0.17em] text-slate-500">SATELLITE RESEARCH PLATFORM</div>
+    <main className="as-home">
+      <section className="as-hero">
+        <div className="as-hero-grid" aria-hidden="true" />
+        <div className="as-container as-hero-layout">
+          <div className="as-hero-copy">
+            <p className="as-eyebrow"><span className="as-eyebrow-dot" /> EARTH OBSERVATION / INDIA</p>
+            <h1>Seeing patterns<br />beyond the <span>surface.</span></h1>
+            <p className="as-lead">An interactive research experience uncovering historical aerosol-loading patterns across India, using INSAT-3D observations and unsupervised learning.</p>
+            <div className="as-hero-actions">
+              <Link to="/explore" className="as-button as-button-primary">Explore the atlas <ArrowUpRight size={19} aria-hidden="true" /></Link>
+              <Link to="/research" className="as-button as-button-secondary">Our methodology <ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
+            <p className="as-hero-disclaimer"><ShieldCheck size={16} aria-hidden="true" /> Historical research (2022–2024), not real-time AQI or surface PM2.5</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3"><Link to="/models" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory →</Link><Link to="/hotspots" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Hotspot Explorer →</Link><Link to="/compare" className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link><Link to="/explore" className="rounded-full bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1b5360]">Explore India Atlas →</Link><div className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm">
-            <span aria-hidden="true" className={`size-2 rounded-full ${apiConnected ? 'bg-emerald-500' : connection.state === 'loading' ? 'bg-amber-400' : 'bg-rose-500'}`} />
-            {connection.state === 'loading' ? 'Checking Flask connection' : apiConnected ? 'Flask API connected' : 'Backend unavailable'}
-          </div></div>
+          <div className="as-hero-visual">
+            <OrbitalScene />
+            <p className="as-visual-caption">ORBITAL STUDY / CONCEPTUAL VISUALIZATION</p>
+          </div>
         </div>
-      </header>
+        <div className="as-container as-metric-row" aria-label="Research snapshot">
+          <div><strong>643</strong><span>observation dates</span></div>
+          <div><strong>02</strong><span>clustering models</span></div>
+          <div><strong>K = 4 / 5</strong><span>selected cluster counts</span></div>
+          <div><strong>INSAT-3D</strong><span>satellite data source</span></div>
+        </div>
+      </section>
 
-      <main className="mx-auto max-w-6xl px-6 pb-20 pt-14">
-        <section className="max-w-3xl">
-          <div className="mb-5 inline-block rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold tracking-wider text-teal-800">AEROSCOPE INDIA · RESEARCH PORTAL</div>
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Explore historical aerosol patterns across India.</h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">
-            A research interface for INSAT-3D observations and unsupervised clustering.
-            Explore our interactive hotspot-centre atlas, with historical location analysis and model interpretation. The fully animated visual design will follow after the core functions are stable.
-          </p>
-          <p className="mt-3 text-sm font-medium text-slate-500">Observation window: 23 Aug 2022 to 5 Jun 2024 · Not real-time AQI</p>
-        </section>
-
-        <section aria-labelledby="connection-heading" className="mt-11 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 id="connection-heading" className="text-xl font-semibold">API connection check</h2>
-              <p className="mt-1 text-sm text-slate-500">Requests: GET /health and GET /capabilities</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAttempt((current) => current + 1)}
-              disabled={connection.state === 'loading'}
-              className="rounded-full bg-[#123d48] px-5 py-2 text-sm font-medium text-white hover:bg-[#1b5360] disabled:cursor-wait disabled:opacity-60"
-            >
-              {connection.state === 'loading' ? 'Connecting…' : 'Retry connection'}
-            </button>
+      <section className="as-light-section" id="discover">
+        <div className="as-container">
+          <div className="as-section-heading">
+            <div><p className="as-kicker">THE PLATFORM</p><h2>Explore the research<br /><em>from every angle.</em></h2></div>
+            <p>From a country-wide view to individual cluster profiles, each module examines a different dimension of the same historical satellite record.</p>
           </div>
-
-          {connection.state === 'error' && (
-            <div role="alert" className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-              <strong>Connection failed:</strong> {connection.message}
-              <p className="mt-2">Check that Flask is running at {API_BASE} and that your local CORS origin allows http://localhost:5173.</p>
-            </div>
-          )}
-
-          <div className="mt-7 grid gap-4 md:grid-cols-3">
-            <StateCard
-              label="Flask server"
-              value={connection.state === 'loading' ? 'Checking…' : apiConnected ? 'Connected' : 'Unavailable'}
-              note={apiConnected ? connection.health.service : 'Start Flask in a separate terminal'}
-            />
-            <StateCard
-              label="Research data"
-              value={capabilities ? capabilities.research_data_loaded ? 'Installed' : 'Not installed' : 'Not checked'}
-              note="Reports whether the backend found the research artifacts"
-            />
-            <StateCard
-              label="Public results"
-              value={capabilities ? capabilities.research_results_available ? 'Enabled' : 'Restricted' : 'Not checked'}
-              note="A restriction is expected on public hosting before permission is confirmed"
-            />
-          </div>
-
-          <p className="mt-5 break-all text-xs text-slate-500">
-            API base: <code className="rounded bg-slate-100 px-2 py-1">{API_BASE}</code>
-          </p>
-          <a className="mt-4 inline-block text-sm font-semibold text-teal-800 underline underline-offset-4 hover:text-teal-600" href={`${API_BASE}/openapi.json`} target="_blank" rel="noreferrer">Open Flask API specification</a>
-        </section>
-
-        <section aria-labelledby="modules-heading" className="mt-14">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 id="modules-heading" className="text-2xl font-semibold tracking-tight">Explore AeroScope modules</h2>
-            <p className="text-sm text-slate-500">Atlas, state comparison, and historical hotspot region exploration</p>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-3"><Link to="/explore" className="inline-block rounded-full bg-teal-800 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700">Open interactive atlas →</Link><Link to="/hotspots" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Browse hotspots →</Link><Link to="/models" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory →</Link><Link to="/compare" className="inline-block rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states →</Link></div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {futureModules.map((module) => (
-              <article key={module.number} className="min-h-36 rounded-2xl border border-slate-200 bg-white p-5">
-                <p className="text-xs font-bold tracking-[0.2em] text-[#1f8979]">{module.number}</p>
-                <h3 className="mt-4 text-lg font-semibold">{module.name}</h3>
-                <p className="mt-1 text-sm text-slate-500">{module.detail}</p>
-              </article>
+          <div className="as-module-grid">
+            {modules.map(({ path, number, name, subtitle, description, icon: Icon, tone }, index) => (
+              <Link key={path} to={path} className={`as-module-card as-module-${tone}${index === 0 ? ' as-featured-card' : ''}`}>
+                <div className="as-module-top"><span>{number} / RESEARCH TOOL</span><ArrowUpRight size={20} aria-hidden="true" /></div>
+                <div className="as-module-icon"><Icon size={26} strokeWidth={1.6} aria-hidden="true" /></div>
+                <p className="as-module-subtitle">{subtitle}</p>
+                <h3>{name}</h3>
+                <p className="as-module-description">{description}</p>
+                <span className="as-module-link">Open module <ChevronRight size={18} aria-hidden="true" /></span>
+              </Link>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <footer className="mt-14 border-t border-slate-200 pt-6 text-sm leading-6 text-slate-500">
-          Scientific interpretation only. AOD is not equivalent to surface PM2.5 or AQI. Public access to detailed MOSDAC-derived results remains restricted pending the relevant publication permissions.
-        </footer>
-      </main>
-    </div>
+      <section className="as-data-section">
+        <div className="as-container as-data-layout">
+          <div className="as-data-intro">
+            <p className="as-kicker">TRANSPARENT BY DESIGN</p>
+            <h2>Data with context.<br /><em>Not just colour.</em></h2>
+            <p>AeroScope presents exploratory patterns with methodology, observation coverage and model limitations. Elevated AOD is not direct evidence of an emission source or an air quality forecast.</p>
+            <Link to="/research" className="as-inline-link">Read the research approach <ArrowUpRight size={18} /></Link>
+            <div className="as-data-tags"><span><Layers3 size={15} /> Clustering</span><span><Wind size={15} /> Aerosol optical depth</span><span><Radar size={15} /> Remote sensing</span></div>
+          </div>
+          <div className="as-status-card">
+            <div className="as-status-heading">
+              <div><p className="as-status-eyebrow">SYSTEM STATUS</p><h3>Research API</h3></div>
+              <span className={`as-status-pill ${connection.state === 'connected' ? 'is-online' : connection.state === 'loading' ? 'is-loading' : 'is-offline'}`}>
+                <span className="as-status-indicator" /> {connection.state === 'connected' ? 'Online' : connection.state === 'loading' ? 'Checking' : 'Unavailable'}
+              </span>
+            </div>
+            <div className="as-status-body">
+              <div className="as-status-line"><span>Flask connection</span><strong>{connection.state === 'connected' ? <><CheckCircle2 size={16}/> Connected</> : connection.state === 'loading' ? 'Checking…' : <><CircleAlert size={16}/> Not connected</>}</strong></div>
+              <div className="as-status-line"><span>Local research artifacts</span><strong>{capabilities ? capabilities.research_data_loaded ? 'Available on server' : 'Not installed' : 'Not checked'}</strong></div>
+              <div className="as-status-line"><span>Public results access</span><strong>{capabilities ? capabilities.research_results_available ? 'Enabled' : 'Restricted' : 'Not checked'}</strong></div>
+            </div>
+            {connection.state === 'error' && <div role="alert" className="as-status-error">{connection.message}. Verify your deployed API URL and CORS origin.</div>}
+            <div className="as-status-footer">
+              <button type="button" className="as-refresh-button" disabled={connection.state === 'loading'} onClick={() => setAttempt(value => value + 1)}><RefreshCw size={15} aria-hidden="true"/> Retry connection</button>
+              <a href={`${API_BASE}/openapi.json`} target="_blank" rel="noreferrer" className="as-api-link">API specification <ArrowUpRight size={15} aria-hidden="true" /></a>
+            </div>
+            <p className="as-api-base">API base: <code>{API_BASE}</code></p>
+          </div>
+        </div>
+      </section>
+      <footer className="as-home-footer"><div className="as-container as-footer-content"><span>© AeroScope India / Historical satellite research</span><span>Data source: MOSDAC / SAC / ISRO · Detailed data publication subject to permission</span></div></footer>
+    </main>
   )
 }
