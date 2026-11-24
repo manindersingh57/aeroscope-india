@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ArrowUpRight, BookOpen, ChartNoAxesCombined, FlaskConical,
-  LayoutDashboard, MapPinned, Menu, Orbit, X,
+  LayoutDashboard, MapPinned, Menu, Orbit, Users, X,
 } from 'lucide-react'
 
 const navigation = [
@@ -11,6 +11,7 @@ const navigation = [
   { path: '/models', label: 'ML Laboratory', icon: FlaskConical },
   { path: '/cluster-insights', label: 'Cluster Insights', icon: ChartNoAxesCombined },
   { path: '/research', label: 'Methodology', icon: BookOpen },
+  { path: '/impact', label: 'Social Impact', icon: Users },
 ]
 
 export default function AeroLightShell({ children }: { children: ReactNode }) {

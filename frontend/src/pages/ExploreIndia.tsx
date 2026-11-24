@@ -1,282 +1,344 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Activity, ArrowLeft, ChevronDown, ExternalLink, Layers, LocateFixed, MapPin, RefreshCw } from 'lucide-react'
-import AeroMap from '../components/AeroMap'
-import { API_BASE, aeroscopeApi, type Capabilities } from '../lib/aeroscopeApi'
-import type { HotspotFeature, HotspotsCollection, LayerCatalogue, LocationResult, ModelId } from '../lib/mapTypes'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  ArrowUpRight, CalendarDays, Check, ChevronDown, CircleAlert, Compass, Database,
+  FileJson2, Layers3, LocateFixed, MapPinned, RotateCcw, ScanLine,
+  Satellite, Search, ShieldCheck, SlidersHorizontal, Sparkles, Upload, Map as MapIcon, Flame,
+} from 'lucide-react'
+import GeoExplorerMap, { aodPercentiles, normalizeStateName, type AtlasLayer, type GridCell, type GridDataset, type StateAODStats } from '../components/GeoExplorerMap'
+import { aeroscopeApi, type Capabilities } from '../lib/aeroscopeApi'
+import type { LayerCatalogue, LocationResult } from '../lib/mapTypes'
+import type { StateProfile, StateSummary } from '../lib/regionalTypes'
+import '../styles/aeroscope-geo.css'
 
-const pageSize = 200
-const formatNumber = (value: number | null | undefined, digits = 3): string =>
-  value === null || value === undefined || !Number.isFinite(value) ? 'Not available' : value.toFixed(digits)
+const LAYERS: Array<{ key: AtlasLayer; title: string; subtitle: string; icon: typeof Layers3 }> = [
+  { key: 'heat', title: 'AOD Heatmap', subtitle: 'Smoothed, relative intensity', icon: Flame },
+  { key: 'states', title: 'State AOD Map', subtitle: 'Compare state-level means', icon: MapIcon },
+  { key: 'mean', title: 'Detailed Grid', subtitle: 'Original mean AOD cells', icon: ScanLine },
+  { key: 'model_a', title: 'Model A · K=4', subtitle: 'Broad loading patterns', icon: Layers3 },
+  { key: 'model_b', title: 'Model B · K=5', subtitle: 'Seasonal aerosol patterns', icon: CalendarDays },
+]
 
-function getMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Unable to load research data'
+const MODEL_A = [
+  { name: 'Lower Aerosol Loading', color: '#2A9D8F' },
+  { name: 'Moderate Aerosol Loading', color: '#E9C46A' },
+  { name: 'Elevated and Variable Loading', color: '#F4A261' },
+  { name: 'Frequent Elevated Loading', color: '#D62828' },
+]
+const MODEL_B = [
+  { name: 'Lower Seasonal Loading', color: '#2A9D8F' },
+  { name: 'Moderate Pre-monsoon Leaning', color: '#E9C46A' },
+  { name: 'Monsoon-Dominant Loading', color: '#457B9D' },
+  { name: 'Strong Pre-monsoon Peak', color: '#E76F51' },
+  { name: 'Elevated Across Seasons', color: '#9D174D' },
+]
+const STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh',
+  'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
+  'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Madhya Pradesh', 'Maharashtra',
+  'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab',
+  'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
+  'Uttarakhand', 'West Bengal',
+]
+
+function formatNum(value: number | null | undefined, decimals = 3) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(decimals) : '—'
+}
+function isLayer(value: string | null): value is AtlasLayer {
+  return value === 'heat' || value === 'states' || value === 'mean' || value === 'model_a' || value === 'model_b'
+}
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Request failed'
+}
+function parseGrid(source: unknown): GridDataset {
+  if (!source || typeof source !== 'object') throw new Error('Invalid local grid file')
+  const obj = source as Partial<GridDataset>
+  if (obj.schema !== 'aeroscope-local-geo-v1' || !Array.isArray(obj.cells) || !obj.cell_step) {
+    throw new Error('Use the JSON created by tools/export_geoexplorer_local.py')
+  }
+  if (obj.cells.length > 200_000) throw new Error('Unexpectedly large grid file')
+  if (!(obj.cell_step.lat > 0 && obj.cell_step.lat < 1 && obj.cell_step.lon > 0 && obj.cell_step.lon < 1)) {
+    throw new Error('Invalid geographic grid resolution')
+  }
+  // Validate every row before drawing it. These are private *local* research results.
+  for (const row of obj.cells) {
+    if (!Array.isArray(row) || row.length !== 7 ||
+      typeof row[0] !== 'number' || !Number.isFinite(row[0]) ||
+      typeof row[1] !== 'number' || !Number.isFinite(row[1]) ||
+      row[0] < 4 || row[0] > 40 || row[1] < 65 || row[1] > 100 ||
+      ![2, 3, 4].every(i => row[i] === null || (typeof row[i] === 'number' && Number.isFinite(row[i]))) ||
+      !(row[5] === null || typeof row[5] === 'string')) {
+      throw new Error('Invalid values in grid cells. Re-export from the verified local Parquet file.')
+    }
+  }
+  return obj as GridDataset
 }
 
 export default function ExploreIndia() {
-  const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
-  const [layers, setLayers] = useState<LayerCatalogue | null>(null)
-  const [setupLoading, setSetupLoading] = useState(true)
-  const [setupError, setSetupError] = useState<string | null>(null)
-  const [model, setModel] = useState<ModelId>('model_a')
-  const [draftState, setDraftState] = useState('')
-  const [stateFilter, setStateFilter] = useState('')
+  const [params, setParams] = useSearchParams()
+  const [layer, setLayer] = useState<AtlasLayer>(() => isLayer(params.get('layer')) ? params.get('layer') as AtlasLayer : 'heat')
+  const [regionInput, setRegionInput] = useState(params.get('state') ?? '')
+  const [focusedState, setFocusedState] = useState(params.get('state') ?? '')
   const [focusRevision, setFocusRevision] = useState(0)
-  const [clusterName, setClusterName] = useState('')
-  const [minCells, setMinCells] = useState(1)
-  const [hotspots, setHotspots] = useState<HotspotsCollection | null>(null)
-  const [hotspotsLoading, setHotspotsLoading] = useState(false)
-  const [moreLoading, setMoreLoading] = useState(false)
-  const [hotspotsError, setHotspotsError] = useState<string | null>(null)
-  const [selectedHotspot, setSelectedHotspot] = useState<HotspotFeature | null>(null)
-  const [coordinates, setCoordinates] = useState<{ lat: number; lon: number } | null>(null)
-  const [inputLat, setInputLat] = useState('30.901')
-  const [inputLon, setInputLon] = useState('75.857')
+  const [dataset, setDataset] = useState<GridDataset | null>(null)
+  const [fileError, setFileError] = useState('')
+  const [fileLoading, setFileLoading] = useState(false)
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
+  const [legends, setLegends] = useState<LayerCatalogue | null>(null)
+  const [apiStateSummaries, setApiStateSummaries] = useState<StateSummary[]>([])
+  const [apiError, setApiError] = useState('')
+  const [selectedPoint, setSelectedPoint] = useState<{ lat: number; lon: number } | null>(null)
   const [location, setLocation] = useState<LocationResult | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
-  const inFlightMore = useRef<AbortController | null>(null)
-  const activeModel = layers?.layers[model] ?? null
+  const [stateProfile, setStateProfile] = useState<StateProfile | null>(null)
+  const [stateLoading, setStateLoading] = useState(false)
+  const [stateError, setStateError] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
   const allowed = Boolean(capabilities?.research_data_loaded && capabilities.research_results_available)
+  // Mean AOD by state is calculated only from real, locally imported grid cells.
+  // It is the unweighted average of grid-cell historical mean AOD, not AQI or PM2.5.
+  const stateStats = useMemo(() => {
+    const result = new Map<string, StateAODStats>()
+    if (dataset) {
+      const totals = new Map<string, { name: string; sum: number; count: number; max: number }>()
+      for (const cell of dataset.cells) {
+        const [,, aod,,, name] = cell
+        if (!name || aod === null) continue
+        const key = normalizeStateName(name)
+        const prev = totals.get(key) ?? { name, sum: 0, count: 0, max: Number.NEGATIVE_INFINITY }
+        prev.sum += aod
+        prev.count += 1
+        prev.max = Math.max(prev.max, aod)
+        totals.set(key, prev)
+      }
+      for (const [key, val] of totals) result.set(key, {
+        name: val.name, meanAod: val.sum / val.count, validCells: val.count,
+        maxCellMeanAod: val.max, source: 'local-grid',
+      })
+    }
+    // Authoritative backend summaries override local aggregation when permitted.
+    for (const state of apiStateSummaries) result.set(normalizeStateName(state.state), {
+      name: state.state, meanAod: state.mean_aod, validCells: state.valid_aod_cells,
+      coveragePercent: state.valid_aod_percent, source: 'backend',
+    })
+    return result
+  }, [dataset, apiStateSummaries])
+
+  useEffect(() => {
+    if (!allowed) { setApiStateSummaries([]); return }
+    const controller = new AbortController()
+    aeroscopeApi.stateSummaries(controller.signal)
+      .then(states => { if (!controller.signal.aborted) setApiStateSummaries(states) })
+      .catch(() => { /* Local-only state information remains available. */ })
+    return () => controller.abort()
+  }, [allowed])
+  const selectedLocalCell = useMemo((): GridCell | null => {
+    if (!selectedPoint || !dataset) return null
+    let best: GridCell | null = null
+    let minimum = Number.POSITIVE_INFINITY
+    for (const row of dataset.cells) {
+      const distance = ((row[0] - selectedPoint.lat) ** 2) +
+        ((row[1] - selectedPoint.lon) * Math.cos(selectedPoint.lat * Math.PI / 180)) ** 2
+      if (distance < minimum) { minimum = distance; best = row }
+    }
+    return best && minimum < 0.1 ** 2 ? best : null
+  }, [selectedPoint, dataset])
 
   useEffect(() => {
     const controller = new AbortController()
-    setSetupLoading(true)
-    setSetupError(null)
     Promise.all([aeroscopeApi.capabilities(controller.signal), aeroscopeApi.layers(controller.signal)])
-      .then(([capabilityResponse, layerResponse]) => {
-        setCapabilities(capabilityResponse)
-        setLayers(layerResponse)
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setSetupError(getMessage(error))
-      })
-      .finally(() => { if (!controller.signal.aborted) setSetupLoading(false) })
+      .then(([caps, details]) => { if (!controller.signal.aborted) { setCapabilities(caps); setLegends(details) } })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setApiError(errorMessage(error)) })
     return () => controller.abort()
   }, [])
 
   useEffect(() => {
-    inFlightMore.current?.abort()
-    setMoreLoading(false)
     const controller = new AbortController()
-    setSelectedHotspot(null)
-    setHotspots(null)
-    setHotspotsError(null)
-    if (!allowed) {
-      setHotspotsLoading(false)
-      return () => controller.abort()
-    }
-    setHotspotsLoading(true)
-    aeroscopeApi.hotspotCenters(model, {
-      state: stateFilter, clusterName, minCells, offset: 0, limit: pageSize,
-    }, controller.signal)
-      .then(setHotspots)
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setHotspotsError(getMessage(error))
-      })
-      .finally(() => { if (!controller.signal.aborted) setHotspotsLoading(false) })
+    setStateProfile(null)
+    setStateError('')
+    if (!focusedState || !allowed) return () => controller.abort()
+    setStateLoading(true)
+    aeroscopeApi.stateProfile(focusedState, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setStateProfile(result) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setStateError(errorMessage(error)) })
+      .finally(() => { if (!controller.signal.aborted) setStateLoading(false) })
     return () => controller.abort()
-  }, [allowed, model, stateFilter, clusterName, minCells])
+  }, [focusedState, allowed])
 
   useEffect(() => {
     const controller = new AbortController()
     setLocation(null)
-    setLocationLoading(false)
-    setLocationError(null)
-    if (!coordinates || !allowed) return () => controller.abort()
+    if (!selectedPoint || !allowed) return () => controller.abort()
     setLocationLoading(true)
-    aeroscopeApi.location(coordinates.lat, coordinates.lon, controller.signal)
-      .then(setLocation)
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLocationError(getMessage(error))
-      })
+    aeroscopeApi.location(selectedPoint.lat, selectedPoint.lon, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setLocation(result) })
+      .catch(() => { /* Local in-memory grid remains usable when the Flask API is unavailable. */ })
       .finally(() => { if (!controller.signal.aborted) setLocationLoading(false) })
     return () => controller.abort()
-  }, [allowed, coordinates])
+  }, [selectedPoint, allowed])
 
-  const displayedFeatures = useMemo(() => hotspots?.features ?? [], [hotspots])
-  const activeProfile = location?.profile?.[model]
-
-  async function loadMore() {
-    if (!hotspots?.pagination.has_more || moreLoading) return
-    const controller = new AbortController()
-    inFlightMore.current?.abort()
-    inFlightMore.current = controller
-    setMoreLoading(true)
-    setHotspotsError(null)
+  function chooseLayer(next: AtlasLayer) {
+    setLayer(next)
+    setParams(old => { const updated = new URLSearchParams(old); updated.set('layer', next); return updated }, { replace: true })
+  }
+  function chooseState(next: string) {
+    setFocusedState(next)
+    setRegionInput(next)
+    setFocusRevision(v => v + 1)
+    setParams(old => { const updated = new URLSearchParams(old); if (next) updated.set('state', next); else updated.delete('state'); return updated }, { replace: true })
+  }
+  function submitState(event: FormEvent<HTMLFormElement>) { event.preventDefault(); chooseState(regionInput.trim()) }
+  async function loadLocalFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setFileError('')
+    if (file.size > 40_000_000) { setFileError('File is too large. Use the supplied export script.'); return }
+    setFileLoading(true)
     try {
-      const next = await aeroscopeApi.hotspotCenters(model, {
-        state: stateFilter, clusterName, minCells,
-        offset: hotspots.pagination.offset + hotspots.pagination.limit,
-        limit: pageSize,
-      }, controller.signal)
-      if (!controller.signal.aborted) {
-        setHotspots({ ...next, features: [...hotspots.features, ...next.features] })
-      }
-    } catch (error: unknown) {
-      if (!controller.signal.aborted) setHotspotsError(getMessage(error))
-    } finally {
-      if (!controller.signal.aborted) setMoreLoading(false)
-    }
+      const parsed = parseGrid(JSON.parse(await file.text()) as unknown)
+      setDataset(parsed)
+    } catch (error) { setFileError(errorMessage(error)) }
+    finally { setFileLoading(false) }
   }
 
-  function chooseCoordinate(lat: number, lon: number) {
-    setSelectedHotspot(null)
-    setCoordinates({ lat, lon })
-    setInputLat(lat.toFixed(5))
-    setInputLon(lon.toFixed(5))
-  }
-
-  function submitCoordinates(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const lat = Number(inputLat)
-    const lon = Number(inputLon)
-    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      setLocationError('Please enter valid latitude (−90 to 90) and longitude (−180 to 180).')
-      return
-    }
-    chooseCoordinate(lat, lon)
-  }
+  const heatQuantiles = useMemo(() => aodPercentiles(dataset), [dataset])
+  const stateColorRange = useMemo(() => {
+    const means = [...stateStats.values()].map(s => s.meanAod).filter((v): v is number => v !== null && Number.isFinite(v)).sort((a,b) => a-b)
+    return means.length ? [means[Math.floor(.1 * (means.length-1))], means[Math.floor(.9 * (means.length-1))]] : null
+  }, [stateStats])
+  const modelLegend = layer === 'model_a' || layer === 'model_b' ? legends?.layers[layer] ?? null : null
+  const fallbackLegend = layer === 'model_a' ? MODEL_A : MODEL_B
+  const palette = modelLegend?.clusters?.length
+    ? [...modelLegend.clusters].sort((a, b) => a.rank - b.rank).map(c => ({ name: c.name, color: c.color }))
+    : fallbackLegend
+  const localModelRank = selectedLocalCell ? (layer === 'model_a' ? selectedLocalCell[3] : layer === 'model_b' ? selectedLocalCell[4] : null) : null
+  const apiProfile = location?.profile
+  const clusterName = layer !== 'model_a' && layer !== 'model_b' ? null : apiProfile?.[layer]?.cluster_name ??
+    (localModelRank === null ? null : palette[localModelRank]?.name ?? null)
 
   return (
-    <div className="min-h-screen bg-[#f3f6f7] text-[#112f38]">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1580px] flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
-          <Link to="/" className="flex items-center gap-3 no-underline">
-            <span className="grid size-10 place-items-center rounded-xl bg-[#113e48] text-xl text-white">◎</span>
-            <div><div className="text-lg font-bold tracking-tight">AeroScope <span className="text-[#1f8979]">India</span></div><div className="text-[10px] tracking-[0.19em] text-slate-500">SATELLITE RESEARCH PLATFORM</div></div>
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><Activity size={15} /> Historical AOD, not live AQI</span>
-            <Link to="/hotspots" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Browse hotspots</Link>
-            <Link to="/models" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Model Laboratory</Link>
-            <Link to="/compare" className="inline-flex items-center gap-2 rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">Compare states</Link>
-            <Link to="/" className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-50"><ArrowLeft size={16}/> Home</Link>
-          </div>
+    <div className="ag-explorer">
+      <div className="ag-heading">
+        <div>
+          <span className="ag-eyebrow"><Satellite size={14} /> SATELLITE INTELLIGENCE / GEOSPATIAL ATLAS</span>
+          <h1>Geo <span>Explorer.</span></h1>
+          <p>Explore historical aerosol loading with an interactive heatmap, state-level comparisons and both verified clustering models.</p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-[1580px] px-5 pb-14 pt-8 lg:px-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-[0.19em] text-teal-700">Explore India · Interactive atlas</div>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Discover historical aerosol patterns</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">INSAT-3D observations, 23 Aug 2022 to 5 Jun 2024. Model classifications and hotspot centres are historical research outputs.</p>
-          </div>
-          <div className="rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-xs font-semibold text-teal-900">{allowed ? 'Local research data available' : setupLoading ? 'Checking data access…' : 'Research results restricted'}</div>
+        <div className="ag-head-meta">
+          <span><span className="ag-dot"/> HISTORICAL · 2022–2024</span>
+          <Link to="/cluster-insights">View cluster insights <ArrowUpRight size={15}/></Link>
         </div>
+      </div>
 
-        {setupError && <p role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">Unable to contact Flask: {setupError}. Check the API at {API_BASE}.</p>}
-        {!setupLoading && !setupError && !allowed && (
-          <div role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-            {capabilities?.research_data_loaded ? 'Map legends are available, but detailed research results are disabled on this server until publication permissions are confirmed.' : 'The backend is reachable, but its scientific dataset has not been installed. The basemap and model legends can still be explored.'}
-          </div>
-        )}
-
-        <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <aside className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2 font-semibold"><Layers size={18} className="text-teal-700"/> Model layers</div>
-              <div className="space-y-2">
-                {(['model_a', 'model_b'] as const).map((id) => (
-                  <button type="button" key={id} onClick={() => { setModel(id); setClusterName('') }}
-                    aria-pressed={model === id}
-                    className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition ${model === id ? 'border-teal-700 bg-teal-50 text-teal-900' : 'border-slate-200 hover:bg-slate-50'}`}>
-                    <div className="font-semibold">{id === 'model_a' ? 'Model A · Broad loading' : 'Model B · Seasonal behaviour'}</div>
-                    <div className="mt-1 text-xs text-slate-500">{id === 'model_a' ? '4 aerosol-loading clusters' : '5 seasonal-pattern clusters'}</div>
-                  </button>
-                ))}
-              </div>
-              <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); setStateFilter(draftState.trim()); setFocusRevision((v) => v + 1) }}>
-                <label className="block text-xs font-semibold text-slate-600" htmlFor="state-search">Find a state · zoom and highlight</label>
-                <input id="state-search" value={draftState} onChange={(event) => setDraftState(event.target.value)} placeholder="e.g. Punjab" list="as-indian-states" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-                <datalist id="as-indian-states">{["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"].map((name) => <option key={name} value={name}/>)}</datalist>
-                <button type="submit" className="w-full rounded-lg bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205863]">Zoom to state & filter hotspots</button>
-                <button type="button" onClick={() => { setStateFilter(''); setDraftState(''); setFocusRevision((v) => v + 1) }} className="w-full rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50">Reset to all India</button>
-              </form>
-              <label className="mt-4 block text-xs font-semibold text-slate-600" htmlFor="cluster-filter">Cluster</label>
-              <div className="relative mt-2">
-                <select id="cluster-filter" value={clusterName} onChange={(event) => setClusterName(event.target.value)} className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-sm">
-                  <option value="">All clusters</option>
-                  {(activeModel?.clusters ?? []).map((cluster) => <option key={cluster.cluster_id} value={cluster.name}>{cluster.name}</option>)}
-                </select>
-                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-2.5 text-slate-500"/>
-              </div>
-              <label className="mt-4 block text-xs font-semibold text-slate-600" htmlFor="min-cells">Minimum hotspot size</label>
-              <select id="min-cells" value={minCells} onChange={(event) => setMinCells(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                {[1, 10, 25, 100].map((n) => <option key={n} value={n}>{n} grid cell{n === 1 ? '' : 's'} minimum</option>)}
-              </select>
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="font-semibold">{activeModel?.title ?? 'Cluster legend'}</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{activeModel?.description ?? 'Loading cluster definitions…'}</p>
-              <div className="mt-4 space-y-3">
-                {(activeModel?.clusters ?? []).map((cluster) => (
-                  <div className="flex items-start gap-3" key={cluster.cluster_id}>
-                    <span className="mt-1 size-3 shrink-0 rounded-full ring-2 ring-white" style={{ backgroundColor: cluster.color }}/>
-                    <div><div className="text-xs font-semibold">{cluster.name}</div><p className="mt-0.5 text-xs leading-5 text-slate-500">{cluster.description}</p></div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </aside>
-
-          <section aria-label="India interactive map" className="min-w-0 space-y-3">
-            <AeroMap features={allowed ? displayedFeatures : []} legend={activeModel} selectedCoordinates={coordinates} focusState={stateFilter} focusRevision={focusRevision} onStateSelect={(stateName) => { setDraftState(stateName); setStateFilter(stateName); setFocusRevision((v) => v + 1) }} onCoordinateClick={chooseCoordinate} onHotspotClick={(hotspot) => { setSelectedHotspot(hotspot); setCoordinates(null) }} />
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
-              <span><strong className="text-slate-900">{displayedFeatures.length}</strong> of <strong className="text-slate-900">{hotspots?.pagination.total ?? 0}</strong> hotspot centres shown · {hotspotsLoading ? 'Loading…' : 'Model ' + (model === 'model_a' ? 'A' : 'B')}</span>
-              {hotspots?.pagination.has_more && allowed && <button type="button" onClick={loadMore} disabled={moreLoading} className="rounded-lg border border-teal-200 px-3 py-1.5 font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60">{moreLoading ? 'Loading…' : 'Load more markers'}</button>}
+      <div className="ag-workspace">
+        <aside className="ag-sidebar">
+          <section className="ag-card ag-layer-card">
+            <div className="ag-card-title"><div><span className="ag-card-index">01 / EXPLORE</span><h2>Choose a map layer</h2></div><Layers3 size={18}/></div>
+            <p className="ag-card-desc">Choose how to display the same historical research data.</p>
+            <div className="ag-layers" role="radiogroup" aria-label="Scientific map layer">
+              {LAYERS.map(item => {
+                const Icon = item.icon
+                return <button key={item.key} type="button" role="radio" aria-checked={layer === item.key}
+                  className={`ag-layer-button ${layer === item.key ? 'is-active' : ''}`}
+                  onClick={() => chooseLayer(item.key)}>
+                  <span className={`ag-layer-icon ag-icon-${item.key}`}><Icon size={18}/></span>
+                  <span className="ag-layer-copy"><strong>{item.title}</strong><small>{item.subtitle}</small></span>
+                  <span className="ag-layer-check">{layer === item.key && <Check size={13}/>}</span>
+                </button>
+              })}
             </div>
-            {hotspotsError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Hotspot API: {hotspotsError}</p>}
-            {!hotspotsLoading && allowed && displayedFeatures.length === 0 && !hotspotsError && <p className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">No hotspot centres match the current filters. Try clearing the state or cluster filter.</p>}
-            <p className="px-1 text-xs leading-5 text-slate-500">Glowing points represent centres of connected historical AOD regions; size and glow relate to recorded AOD, not ground-level PM2.5 or live AQI. State boundaries are an independent reference layer, not official survey boundaries. Basemap © OpenStreetMap contributors via OpenFreeMap; boundaries © geoBoundaries / DataMeet (CC BY 2.5 IN).</p>
           </section>
 
-          <aside className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="flex items-center gap-2 font-semibold"><LocateFixed size={18} className="text-teal-700"/> Location analysis</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Click an empty map location, or enter coordinates. The API locates the nearest Indian study grid cell.</p>
-              <form onSubmit={submitCoordinates} className="mt-4 grid grid-cols-2 gap-2">
-                <label className="col-span-1 text-xs font-semibold text-slate-600">Latitude<input aria-label="Latitude" required value={inputLat} onChange={(event) => setInputLat(event.target.value)} type="number" step="any" min="-90" max="90" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" /></label>
-                <label className="col-span-1 text-xs font-semibold text-slate-600">Longitude<input aria-label="Longitude" required value={inputLon} onChange={(event) => setInputLon(event.target.value)} type="number" step="any" min="-180" max="180" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" /></label>
-                <button disabled={!allowed} type="submit" className="col-span-2 mt-1 rounded-lg bg-teal-800 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">Analyse location</button>
-              </form>
-              {locationLoading && <p role="status" className="mt-4 text-sm text-slate-600">Looking up nearest satellite grid cell…</p>}
-              {locationError && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-xs text-rose-800">{locationError}</p>}
-              {location && !location.profile && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{location.message ?? 'No matching study cell found within the search radius.'}</p>}
-              {location?.profile && <div className="mt-5 space-y-3 border-t border-slate-200 pt-4 text-sm">
-                <p className="font-semibold">{location.profile.state_name ?? 'Unknown state'}</p>
-                <p className="text-xs text-slate-500">Nearest grid-cell centre {formatNumber(location.profile.distance_km, 1)} km from selected coordinates</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-slate-500">Mean historical AOD</div><div className="mt-1 text-lg font-semibold">{formatNumber(location.profile.aerosol.mean_aod)}</div></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-slate-500">Valid days</div><div className="mt-1 text-lg font-semibold">{location.profile.aerosol.valid_days ?? 'N/A'}</div></div>
+          <section className="ag-card ag-region-card">
+            <div className="ag-card-title"><div><span className="ag-card-index">02 / FOCUS</span><h2>State details</h2></div><Compass size={18}/></div>
+            <form onSubmit={submitState} className="ag-state-form">
+              <label htmlFor="ag-state">Search Indian state</label>
+              <div className="ag-search-field"><Search size={16}/><input id="ag-state" list="ag-state-list" value={regionInput}
+                onChange={event => setRegionInput(event.target.value)} placeholder="e.g. Punjab, Delhi…"/>
+                <datalist id="ag-state-list">{STATES.map(state => <option key={state} value={state}/>)}</datalist>
+              </div>
+              <div className="ag-field-actions"><button type="submit" className="ag-focus-btn"><MapPinned size={15}/> Focus region</button>
+                <button type="button" className="ag-reset-btn" onClick={() => chooseState('')} title="Reset to India"><RotateCcw size={16}/></button></div>
+            </form>
+            <div className="ag-region-profile">
+              <span className="ag-smalllabel">SELECTED REGION</span>
+              <strong>{focusedState || 'All India'}</strong>
+              {stateLoading ? <div className="ag-loading-values" role="status" aria-label="Loading regional analysis"><span className="ag-shimmer-line"/><span className="ag-shimmer-line short"/></div>
+                : stateProfile ? <div key={focusedState} className="ag-mini-stats ag-details-enter">
+                    <div><span>Mean AOD</span><strong>{formatNum(stateProfile.aerosol.mean_aod)}</strong></div>
+                    <div><span>Valid coverage</span><strong>{formatNum(stateProfile.coverage.valid_aod_percent, 1)}%</strong></div>
+                  </div>
+                : focusedState && stateStats.get(normalizeStateName(focusedState)) ? <div className="ag-mini-stats ag-details-enter">
+                  <div><span>Mean AOD · grid cells</span><strong>{formatNum(stateStats.get(normalizeStateName(focusedState))?.meanAod)}</strong></div>
+                  <div><span>Valid grid cells</span><strong>{stateStats.get(normalizeStateName(focusedState))?.validCells?.toLocaleString('en-IN') ?? '—'}</strong></div>
                 </div>
-                <p className="text-xs text-slate-500">{model === 'model_a' ? 'Model A' : 'Model B'} classification</p>
-                <p className="font-semibold">{activeProfile?.available ? activeProfile.cluster_name : activeProfile?.reason ?? 'Insufficient data for classification'}</p>
-                <p className="text-xs leading-5 text-slate-500">Cluster separation is not calibrated prediction confidence. Satellite AOD is not ground-level pollution concentration.</p>
-              </div>}
-            </section>
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="flex items-center gap-2 font-semibold"><MapPin size={18} className="text-teal-700"/> Hotspot detail</h2>
-              {!selectedHotspot ? <p className="mt-3 text-sm leading-6 text-slate-500">Select a coloured hotspot-centre marker on the map to inspect its cluster, represented grid-cell count, and historical AOD.</p> : (
-                <div className="mt-4 space-y-3 text-sm">
-                  <div className="font-semibold">Region #{selectedHotspot.properties.region_id}</div>
-                  <div className="rounded-lg bg-slate-50 p-3 text-sm font-medium">{selectedHotspot.properties.cluster_name}</div>
-                  <div className="grid grid-cols-2 gap-2"><div className="rounded-lg border border-slate-100 p-2"><div className="text-xs text-slate-500">Grid cells</div><strong>{selectedHotspot.properties.grid_cells}</strong></div><div className="rounded-lg border border-slate-100 p-2"><div className="text-xs text-slate-500">Mean AOD</div><strong>{formatNumber(selectedHotspot.properties.mean_aod)}</strong></div></div>
-                  <p className="text-xs text-slate-500">States: {selectedHotspot.properties.states?.join(', ') || 'Not available'}</p>
-                  <button type="button" onClick={() => chooseCoordinate(selectedHotspot.geometry.coordinates[1], selectedHotspot.geometry.coordinates[0])} disabled={!allowed} className="w-full rounded-lg border border-teal-200 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-50">Analyse this centre</button>
-                </div>
-              )}
-            </section>
-            <a href={`${API_BASE}/map/layers`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-2 text-xs font-medium text-teal-800 underline underline-offset-4"><ExternalLink size={14}/> View map layer API</a>
-          </aside>
+                : focusedState && allowed && stateError ? <span className="ag-muted">{stateError}</span>
+                : <span className="ag-muted">Hover a state on the map to see its historical mean AOD. Click to focus.</span>}
+            </div>
+          </section>
+
+          <section className="ag-card ag-legend-card">
+            <div className="ag-card-title"><div><span className="ag-card-index">03 / INTERPRET</span><h2>Legend & research data</h2></div><SlidersHorizontal size={18}/></div>
+            {layer === 'mean' || layer === 'heat' || layer === 'states' ? <div className="ag-ramp-wrap">
+              <div className={`ag-ramp ${layer === 'heat' || layer === 'states' ? 'ag-relative-ramp' : ''}`}/>
+              <div className="ag-ramp-ticks">
+                {layer === 'heat' ? <><span>{heatQuantiles ? heatQuantiles[0].toFixed(2) : 'P10'}</span><span>{heatQuantiles ? heatQuantiles[1].toFixed(2) : 'Median'}</span><span>{heatQuantiles ? heatQuantiles[2].toFixed(2) : 'P90'}</span></>
+                  : layer === 'states' ? <><span>{stateColorRange ? stateColorRange[0].toFixed(2) : 'Lower'}</span><span>State means</span><span>{stateColorRange ? stateColorRange[1].toFixed(2) : 'Higher'}</span></>
+                  : <><span>0.0</span><span>0.8</span><span>1.7</span><span>2.4+</span></>}
+              </div>
+              <p>{layer === 'states' ? 'Relative colors among available state mean AOD values. Hover for actual numbers.' : layer === 'heat' ? 'Smoothed map of REAL mean AOD values; color contrast is scaled between observed P10 and P90 (not health thresholds).' : 'Absolute historical mean AOD for each eligible grid cell (unitless).'}</p>
+              <div className="ag-legend-missing"><i/> Pale grey = missing / insufficient mapped data</div>
+            </div> : <div className="ag-legend-list">
+              {palette.map(item => <div key={item.name} className="ag-legend-item"><i style={{ background: item.color }}/><span>{item.name}</span></div>)}
+              <div className="ag-legend-item"><i style={{ background: '#cbd9d6' }}/><span>Insufficient data</span></div>
+            </div>}
+            <div className="ag-load-section">
+              <div className="ag-local-title"><Database size={15}/><span>Private research grid</span>{dataset && <Check size={15} className="ag-ok"/>}</div>
+              <p>{dataset ? `${dataset.cells.length.toLocaleString('en-IN')} local study cells loaded. None are uploaded.`
+                : 'Load the locally exported grid once to color all three real maps.'}</p>
+              <input ref={inputRef} type="file" className="ag-visually-hidden" accept=".json,application/json" onChange={event => { void loadLocalFile(event) }} aria-label="Load local research grid"/>
+              <button type="button" className="ag-upload-btn" onClick={() => inputRef.current?.click()} disabled={fileLoading}>
+                {dataset ? <FileJson2 size={15}/> : <Upload size={15}/>} {fileLoading ? 'Reading file…' : dataset ? 'Replace local grid' : 'Load local research grid'}
+                <ArrowUpRight size={14}/>
+              </button>
+              {fileError && <p className="ag-error" role="alert">{fileError}</p>}
+            </div>
+          </section>
+        </aside>
+
+        <div className="ag-map-column">
+          <section className="ag-card ag-primary-map">
+            <div className="ag-map-head">
+              <div key={layer} className="ag-map-title-enter"><span className="ag-card-index">INDIA / SPATIAL DISTRIBUTION</span>
+                <h2>{layer === 'heat' ? 'Historical AOD Heatmap' : layer === 'states' ? 'State-Wise Aerosol Loading' : layer === 'mean' ? 'Detailed Mean AOD Grid' : layer === 'model_a' ? 'Broad Aerosol Patterns' : 'Seasonal Aerosol Patterns'}</h2>
+                <p>{layer === 'heat' ? 'Smoothed historical AOD; relative color scale based on observed grid values' : layer === 'states' ? 'State means with relative color contrast; hover for actual AOD values' : layer === 'mean' ? 'Actual historical mean AOD for each valid satellite grid cell'
+                  : layer === 'model_a' ? 'Four unsupervised loading-pattern classes · K = 4'
+                  : 'Five seasonal aerosol-behaviour classes · K = 5'}</p></div>
+              <div className="ag-map-pill"><span className="ag-map-pill-dot"/>{dataset ? 'LOCAL GRID LOADED' : 'MAP READY'}</div>
+            </div>
+            <GeoExplorerMap layer={layer} dataset={dataset} stateStats={stateStats} focusedState={focusedState}
+              focusRevision={focusRevision} selection={selectedPoint} importing={fileLoading}
+              onStateClick={(name, lat, lon) => { chooseState(name); setSelectedPoint({ lat, lon }) }}
+              onMapClick={(lat, lon) => { setSelectedPoint({ lat, lon }) }} />
+            <div className="ag-map-caption"><span><ShieldCheck size={15}/> Historic INSAT-3D AOD, not live AQI or PM2.5</span>
+              <span>Hover to highlight + read mean AOD · Click to inspect</span></div>
+          </section>
+          <section className={`ag-card ag-inspection ${locationLoading ? 'is-inspecting' : ''}`} aria-busy={locationLoading}>
+            <div className="ag-inspection-title"><div><span className="ag-card-index">INSTANT INSPECTION</span><h2>Location intelligence</h2></div><LocateFixed size={19}/></div>
+            {selectedPoint ? <div key={`${layer}-${selectedPoint.lat.toFixed(4)}-${selectedPoint.lon.toFixed(4)}-${locationLoading ? 'loading' : 'ready'}`} className="ag-inspection-results ag-details-enter">
+              <div><span>SELECTED COORDINATES</span><strong>{selectedPoint.lat.toFixed(3)}° N, {selectedPoint.lon.toFixed(3)}° E</strong></div>
+              <div><span>MEAN HISTORICAL AOD</span><strong>{formatNum(apiProfile?.aerosol.mean_aod ?? selectedLocalCell?.[2])}</strong></div>
+              <div><span>VALID OBSERVATION DAYS</span><strong>{apiProfile?.aerosol.valid_days ?? selectedLocalCell?.[6] ?? '—'}</strong></div>
+              <div><span>{layer === 'model_a' || layer === 'model_b' ? 'SELECTED PATTERN' : 'LOCATION'}</span><strong>{layer === 'model_a' || layer === 'model_b' ? clusterName ?? 'Insufficient data' : apiProfile?.state_name ?? selectedLocalCell?.[5] ?? '—'}</strong></div>
+            </div> : <p className="ag-inspection-empty"><MapPinned size={20}/> Click anywhere on the India map to inspect the nearest available research grid cell.</p>}
+            {locationLoading && <div className="ag-detail-fetch" role="status"><span className="ag-detail-spinner"/> Retrieving verified location details…</div>}
+            {apiError && <p className="ag-api-warning"><CircleAlert size={14}/> Local API unavailable. Private imported grid can still display all three maps.</p>}
+          </section>
         </div>
-        <footer className="mt-9 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500">
-          <span>Research demonstration only · INSAT-3D AOD · MOSDAC/SAC/ISRO data attribution required</span>
-          <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center gap-2 font-medium text-teal-800"><RefreshCw size={14}/> Refresh data</button>
-        </footer>
-      </main>
+      </div>
+      <div className="ag-footnote"><Sparkles size={13}/> State shading and heatmaps represent historical AOD, not health or regulatory pollution categories. Private grid data is loaded only in this browser session. <ChevronDown size={13}/></div>
     </div>
   )
 }

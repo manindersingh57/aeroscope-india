@@ -1,3 +1,4 @@
+import UpdatedModelSnapshot from '../components/UpdatedModelSnapshot'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -18,6 +19,7 @@ import IndiaFeaturedMap from '../components/IndiaFeaturedMap'
 import CompareRegions from './CompareRegions'
 import HotspotExplorer from './HotspotExplorer'
 import '../styles/aeroscope-insights.css'
+import ClusterScatterGallery from '../components/ClusterScatterGallery'
 
 type InsightsData = {
   states: StateSummary[] | null
@@ -340,6 +342,9 @@ export default function ClusterInsights() {
       </Panel>
     </div>
 
+    <ClusterScatterGallery />
+
+    <UpdatedModelSnapshot />
     <div className="al-ci-deepdive" id="al-ci-deepdive">
       <div className="al-ci-deepdive-head">
         <div><span className="al-ci-index">RESEARCH WORKSPACES</span><h2>Explore the evidence in depth.</h2><p>Existing regional comparison and hotspot tools remain intact beneath the new visualization dashboard.</p></div>

@@ -5,6 +5,7 @@ import ExploreIndia from './pages/ExploreIndia'
 import ModelLaboratory from './pages/ModelLaboratory'
 import ClusterInsights from './pages/ClusterInsights'
 import Research from './pages/Research'
+import SocietalImpact from './pages/SocietalImpact'
 
 function OldPathRedirect({ tab }: { tab: 'comparison' | 'hotspots' }) {
   const { search, hash } = useLocation()
@@ -20,6 +21,7 @@ function DashboardRoutes() {
     <Route path="/models" element={<div className="al-legacy"><ModelLaboratory/></div>}/>
     <Route path="/cluster-insights" element={<ClusterInsights/>}/>
     <Route path="/research" element={<div className="al-legacy"><Research/></div>}/>
+    <Route path="/impact" element={<SocietalImpact/>}/>
     <Route path="/compare" element={<OldPathRedirect tab="comparison"/>}/>
     <Route path="/hotspots" element={<OldPathRedirect tab="hotspots"/>}/>
     <Route path="*" element={<Navigate to="/" replace/>}/>

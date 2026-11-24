@@ -1,3 +1,4 @@
+import UpdatedModelSnapshot from '../components/UpdatedModelSnapshot'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -16,6 +17,7 @@ import type {
   ModelComparisonsResponse, ModelRobustnessResponse, ModelPCAResponse,
 } from '../lib/modelTypes'
 import '../styles/aeroscope-lab.css'
+import ModelEvaluationGallery from '../components/ModelEvaluationGallery'
 
 type LabData = {
   metrics: ModelMetricsResponse | null
@@ -215,6 +217,14 @@ export default function ModelLaboratory() {
       <span className="al-lab-status-pill">HISTORICAL · 2022–2024</span>
     </div>
 
+    <ModelEvaluationGallery
+      selectedModel={model}
+      selectedMetrics={data.metrics}
+      canAccessApi={allowed}
+      apiLoading={loading}
+      unavailableReason={errors.metrics ?? unavailableDetail}
+    />
+
     <div className="al-lab-two-cols al-lab-primary-row">
       <LabCard index="01 / CLUSTER ANATOMY" title="Inside the clusters" description="Relative share of model-eligible satellite grid cells." className="al-lab-composition">
         <div className="al-lab-composition-body">
@@ -275,7 +285,7 @@ export default function ModelLaboratory() {
         <div className="al-lab-card-footnote"><Info size={14}/> WCSS magnitudes should not be compared directly across different model feature spaces.</div>
       </LabCard>
 
-      <LabCard index="04 / DIMENSIONALITY REDUCTION" title="PCA · cluster projection" description="PC1 and PC2 positions of cluster centroids (not individual geographic locations).">
+      <LabCard index="04 / DIMENSIONALITY REDUCTION" title="PCA · cluster centroids" description="PC1 and PC2 coordinates of the four or five cluster centers. Individual grid-cell PCA scatter plots are in Cluster Insights.">
         {data.pca && pcaPoints.length > 0 ? <div className="al-lab-chart-wrap" role="img" aria-label="PCA projection of saved cluster centroids">
           <ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{ top: 15, right: 20, bottom: 16, left: 2 }}>
             <CartesianGrid strokeDasharray="4 5" stroke="#e8efec"/>
@@ -288,7 +298,7 @@ export default function ModelLaboratory() {
             </Scatter>
           </ScatterChart></ResponsiveContainer>
         </div> : <EmptyChart title={loading ? 'Loading PCA projection' : 'PCA centroids unavailable'} description={errors.pca ?? unavailableDetail}/>}
-        <div className="al-lab-chart-caption"><span>Explained variance</span><strong>{data.pca ? percent(data.pca.total_explained_variance * 100) : '—'}</strong><span className="al-lab-caption-right">Two principal components</span></div>
+        <div className="al-lab-chart-caption"><span>PC1 + PC2 explained variance</span><strong>{data.pca ? percent(data.pca.total_explained_variance * 100) : '—'}</strong><span className="al-lab-caption-right">Two principal components</span></div>
       </LabCard>
     </div>
 
@@ -345,6 +355,7 @@ export default function ModelLaboratory() {
       </LabCard>
     </div>
 
+    <UpdatedModelSnapshot />
     <footer className="al-lab-footer">
       <span><Database size={14}/> INSAT-3D · 23 Aug 2022–5 Jun 2024 · MOSDAC / SAC / ISRO</span>
       <span>Historical AOD · no live pollution readings</span>

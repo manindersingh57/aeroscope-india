@@ -1,3 +1,4 @@
+import AtmosphereHero from '../components/AtmosphereHero'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -104,6 +105,7 @@ export default function Home() {
 
   return (
     <div className="al-overview">
+      <AtmosphereHero />
       <div className="al-page-heading">
         <div>
           <span className="al-page-eyebrow"><span className="al-live-dot"/> INSAT-3D / ATMOSPHERIC RESEARCH</span>
