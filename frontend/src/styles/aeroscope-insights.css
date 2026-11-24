@@ -1,0 +1,94 @@
+/* AeroScope India / Cluster Insights | scoped premium light dashboard. */
+.al-ci{width:100%;color:#1d3832;font-family:Inter,'Segoe UI',system-ui,sans-serif}
+.al-ci *,.al-ci *:before,.al-ci *:after{box-sizing:border-box}
+.al-ci button{cursor:pointer}
+.al-ci button:focus-visible,.al-ci a:focus-visible{outline:3px solid #27baa9;outline-offset:3px}
+.al-ci-pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:25px;margin:12px 0 24px}
+.al-ci-eyebrow{font-size:10px;letter-spacing:.16em;font-weight:800;color:#2b9586;display:flex;align-items:center;gap:8px}
+.al-ci-pulse{display:block;width:7px;height:7px;background:#31c7a7;box-shadow:0 0 0 4px #e1f5eb;border-radius:50%}
+.al-ci-pagehead h1{font-size:clamp(34px,3.8vw,54px);font-weight:850;letter-spacing:-.065em;line-height:1.04;margin:12px 0 10px;color:#132a26}
+.al-ci-pagehead h1 em{font-style:normal;color:#2aa793}
+.al-ci-pagehead p{margin:0;color:#748b80;font-size:12px;line-height:1.65;max-width:650px}
+.al-ci-head-controls{display:flex;align-items:flex-end;flex-direction:column;gap:8px;flex:none}
+.al-ci-control-label,.al-ci-period{font-size:9px;font-weight:800;letter-spacing:.12em;color:#96aaa0}
+.al-ci-model-switch,.al-ci-tab-switch{display:flex;align-items:center;gap:3px;border:1px solid #e2ece6;background:#eaf3ed;border-radius:99px;padding:4px}
+.al-ci-model-switch button,.al-ci-tab-switch button{padding:10px 18px;background:transparent;border:0;color:#789088;border-radius:99px;font-size:11px;font-weight:780;white-space:nowrap}
+.al-ci-model-switch button.is-active,.al-ci-tab-switch button.is-active{background:#fff;color:#178e7f;box-shadow:0 2px 10px #43654a20}
+.al-ci-model-intro{display:flex;align-items:center;gap:17px;padding:14px 18px;border:1px solid #e3efe8;border-radius:17px;background:#f8fcf9;margin-bottom:18px}
+.al-ci-model-badge{display:inline-flex;align-items:center;gap:8px;color:#278b7a;font-size:10px;letter-spacing:.065em;font-weight:900;white-space:nowrap}
+.al-ci-model-intro-text{font-size:11px;color:#7b9387;flex:1;line-height:1.55}
+.al-ci-model-intro button{width:31px;height:31px;background:white;border:1px solid #e4eee9;border-radius:10px;color:#6b8b7f;display:grid;place-items:center;flex:none}
+.al-ci-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:12px}
+.al-ci-kpi{min-width:0;background:#fff;border:1px solid #e6eee8;border-radius:21px;padding:17px 19px;box-shadow:0 6px 22px #51785e0a;display:flex;flex-direction:column;gap:10px}
+.al-ci-kpi-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.al-ci-kpi-top>span{font-size:9px;font-weight:820;letter-spacing:.09em;text-transform:uppercase;color:#96a99c;line-height:1.5}
+.al-ci-kpi-icon{width:35px;height:35px;display:grid;place-items:center;border-radius:11px;color:#2ea98c;background:#e9f7f0;flex:none}
+.al-ci-kpi-orange .al-ci-kpi-icon{color:#df9f52;background:#fff4e5}.al-ci-kpi-violet .al-ci-kpi-icon{color:#9388d4;background:#f2effc}.al-ci-kpi-blue .al-ci-kpi-icon{color:#6ba6c4;background:#ecf6fc}
+.al-ci-kpi>strong{font-size:clamp(25px,2.5vw,34px);letter-spacing:-.06em;line-height:1;color:#1b3930;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:850}
+.al-ci-kpi>small{font-size:10px;color:#93a69a;line-height:1.35}
+.al-ci-status{display:flex;align-items:center;gap:9px;padding:9px 4px 15px;color:#2d9982;font-size:10px;font-weight:800}
+.al-ci-status.is-muted{color:#c59655}.al-ci-status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px #a9e5ce40}
+.al-ci-status-context{color:#a0afa6;font-weight:600;margin-left:auto}
+.al-ci-api-error{border:1px solid #f6d4bc;border-radius:13px;color:#97602d;background:#fff8eb;padding:14px 18px;font-size:12px;margin-bottom:14px;line-height:1.6}
+.al-ci-main-grid{display:grid;grid-template-columns:minmax(0,.98fr) minmax(0,1.12fr);gap:14px;align-items:stretch}
+.al-ci-card{min-width:0;min-height:382px;display:flex;flex-direction:column;padding:23px 25px;background:#fff;border-radius:25px;border:1px solid #e6eee8;box-shadow:0 6px 22px #51785e0a;overflow:hidden}
+.al-ci-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;margin-bottom:17px}
+.al-ci-index{display:block;font-size:9px;font-weight:850;letter-spacing:.115em;color:#9baca1;text-transform:uppercase}
+.al-ci-card-header h2{margin:8px 0 5px;font-size:17px;letter-spacing:-.038em;font-weight:820;line-height:1.2;color:#1a352c}
+.al-ci-card-header p{margin:0;font-size:10px;color:#97a79d;line-height:1.5;max-width:465px}
+.al-ci-panel-link{display:inline-flex;align-items:center;gap:6px;border:0;background:#f2f9f4;color:#188d79!important;font-size:10px;font-weight:820;padding:8px 10px;border-radius:999px;white-space:nowrap;text-decoration:none}
+.al-ci-card-action{flex:none}.al-ci-action-icon{color:#8cb7a4}
+.al-ci-donut{flex:1;display:grid;grid-template-columns:minmax(155px,.9fr) minmax(0,1fr);align-items:center;gap:13px;min-height:210px}
+.al-ci-donut-graphic{position:relative;max-width:215px;aspect-ratio:1;width:100%;margin:auto;display:grid;place-items:center}
+.al-ci-donut-graphic svg{width:100%;height:100%;overflow:visible}
+.al-ci-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;pointer-events:none}
+.al-ci-donut-center strong{font-weight:870;font-size:42px;letter-spacing:-.075em;color:#193a2f;line-height:1}
+.al-ci-donut-center span{font-size:10px;color:#9aaca0}
+.al-ci-donut-list{max-height:210px;overflow-y:auto;padding-right:3px;display:flex;flex-direction:column;gap:1px}
+.al-ci-cluster-row{display:flex;align-items:center;gap:9px;border:0;background:transparent;padding:10px 8px;border-radius:12px;text-align:left;width:100%;transition:background .15s}
+.al-ci-cluster-row:hover,.al-ci-cluster-row.is-active{background:#f0f8f3}
+.al-ci-cluster-row i,.al-ci-chart-legend i,.al-ci-profile-dot{width:9px;height:9px;flex:none;border-radius:50%;box-shadow:0 0 0 4px #def0e585}
+.al-ci-cluster-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#728b7d;font-size:11px;font-weight:700}
+.al-ci-cluster-row strong{color:#335e4a;font-size:11px;white-space:nowrap}
+.al-ci-active-profile{display:flex;align-items:center;gap:12px;background:#f7fbf7;border:1px solid #e8f0e9;border-radius:14px;padding:12px 14px;margin-top:10px}
+.al-ci-active-profile>div{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.al-ci-active-profile strong{font-size:11px;color:#28634e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-ci-active-profile span{font-size:10px;color:#8eaa9b;line-height:1.45}
+.al-ci-active-profile b{font-size:13px;color:#217c63}
+.al-ci-map-card{padding:0;min-height:382px}
+.al-ci-map-card .al-ci-card-header{margin:0;padding:23px 25px 12px}
+.al-ci-map-surface{position:relative;min-height:260px;flex:1;background:radial-gradient(ellipse at 52% 50%,#f7fbf9,#e9f3ed);overflow:hidden}
+.al-ci-map-surface .al-map-root{position:absolute;inset:0}
+.al-ci-map-surface .al-map-leaflet{width:100%;height:100%;min-height:0}
+.al-ci-map-counter{position:absolute;right:11px;bottom:12px;z-index:550;pointer-events:none;color:#426a5c;font-size:10px;font-weight:800;background:#ffffffdd;border:1px solid #e5eee7;border-radius:99px;padding:8px 12px;box-shadow:0 3px 10px #38564617}
+.al-ci-map-footer{padding:12px 22px;display:flex;align-items:center;gap:12px;justify-content:space-between;font-size:10px;color:#839c8f;line-height:1.45}
+.al-ci-map-footer span{display:inline-flex;align-items:center;gap:6px}
+.al-ci-map-footer span:first-child{color:#308e7b;font-weight:760}
+.al-ci-chart-wrap{height:247px;min-width:0;max-width:100%;width:100%;flex:1;min-height:200px}
+.al-ci-chart-foot{margin-top:auto;padding-top:14px;border-top:1px solid #eff3ee;display:flex;align-items:flex-start;gap:7px;color:#91a99a;font-size:10px;line-height:1.5}
+.al-ci-chart-foot svg{flex:none;margin-top:1px}
+.al-ci-chart-legend{display:flex;gap:9px 16px;flex-wrap:wrap;margin-top:auto;padding:10px 0 0}
+.al-ci-chart-legend>span{font-size:9px;color:#7c998a;display:flex;gap:7px;align-items:center;max-width:47%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-ci-chart-legend i{width:6px;height:6px;box-shadow:none}
+.al-ci-soft-chip{font-size:9px;font-weight:800;color:#3d9882;padding:7px 11px;border-radius:99px;background:#edf7ef;white-space:nowrap}
+.al-ci-empty{position:relative;min-height:250px;flex:1;display:grid;place-items:center;background:linear-gradient(140deg,#fafdfa,#f4faf5);border:1px solid #edf3ed;border-radius:16px;overflow:hidden}
+.al-ci-empty-grid{position:absolute;inset:0;background-image:linear-gradient(to right,#e3eee5 1px,transparent 1px),linear-gradient(to bottom,#e3eee5 1px,transparent 1px);background-size:43px 37px;opacity:.38;mask-image:linear-gradient(to bottom,transparent,#000 22%,#000 85%,transparent)}
+.al-ci-empty-label{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;background:#ffffffed;border:1px solid #e7f0e9;box-shadow:0 10px 26px #49765a12;border-radius:16px;padding:21px;max-width:310px;width:84%}
+.al-ci-empty-label svg{color:#92b7a2}.al-ci-empty-label strong{color:#426b57;font-size:12px;line-height:1.25}.al-ci-empty-label span{color:#92a79b;font-size:10px;line-height:1.6}
+.al-ci-deepdive{margin-top:18px;border:1px solid #e3eee7;background:#fff;border-radius:25px;overflow:hidden}
+.al-ci-deepdive-head{padding:24px 26px;border-bottom:1px solid #eaf0e8;display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.al-ci-deepdive-head h2{margin:7px 0;font-size:25px;font-weight:830;letter-spacing:-.055em;color:#1a382d}
+.al-ci-deepdive-head p{margin:0;font-size:11px;line-height:1.6;color:#95ab9c}
+.al-ci-tab-switch button{display:flex;gap:7px;align-items:center;padding:10px 12px}
+.al-ci-legacy-area{min-width:0}
+/* Existing deep-dive workspaces use standalone layouts. Hide only their nested headers and remove excess shell spacing inside this page. */
+.al-ci-legacy-area>div{min-height:0!important;background:transparent!important}
+.al-ci-legacy-area>div>header{display:none!important}
+.al-ci-legacy-area>div>main{max-width:none!important;padding:19px 24px 28px!important}
+.al-ci-legacy-area>div>main>div:first-child{display:none}
+.al-ci-legacy-area>div>main>footer{display:none}
+.al-ci-footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:10px;line-height:1.55;color:#94a99b;border-top:1px solid #dcebe1;padding:19px 3px 6px;margin-top:21px}
+.al-ci-footer>span{display:inline-flex;align-items:center;gap:6px}.al-ci-footer>span:first-child{margin-right:auto}.al-ci-footer>a{display:inline-flex;align-items:center;gap:4px;color:#2b937e;font-weight:800;text-decoration:none}
+@media(max-width:1200px){.al-ci-kpi{padding:14px}.al-ci-card{padding:20px}.al-ci-map-card{padding:0}.al-ci-map-card .al-ci-card-header{padding:20px 20px 10px}.al-ci-donut{grid-template-columns:145px 1fr}.al-ci-chart-wrap{height:230px}}
+@media(max-width:960px){.al-ci-main-grid{grid-template-columns:1fr}.al-ci-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.al-ci-map-card{min-height:420px}.al-ci-donut{grid-template-columns:210px 1fr}.al-ci-card{min-height:340px}.al-ci-pagehead{align-items:flex-start}.al-ci-deepdive-head{align-items:flex-start;flex-direction:column}}
+@media(max-width:660px){.al-ci-pagehead{flex-direction:column;gap:14px}.al-ci-head-controls{flex-direction:row;align-items:center;flex-wrap:wrap}.al-ci-period{display:none}.al-ci-pagehead h1{font-size:38px}.al-ci-model-intro{flex-wrap:wrap;gap:9px}.al-ci-model-intro-text{order:3;flex-basis:100%}.al-ci-kpi-grid{gap:9px}.al-ci-kpi{padding:13px;border-radius:16px}.al-ci-kpi>strong{font-size:25px}.al-ci-status{align-items:flex-start}.al-ci-status-context{display:none}.al-ci-card{padding:18px;min-height:340px;border-radius:18px}.al-ci-map-card{padding:0;min-height:375px}.al-ci-map-card .al-ci-card-header{padding:18px}.al-ci-donut{grid-template-columns:1fr}.al-ci-donut-graphic{width:180px}.al-ci-donut-list{width:100%;max-height:165px}.al-ci-chart-wrap{height:220px}.al-ci-map-footer{flex-wrap:wrap}.al-ci-deepdive-head{padding:19px}.al-ci-tab-switch{width:100%;justify-content:space-between}.al-ci-tab-switch button{font-size:10px;padding:9px}.al-ci-legacy-area>div>main{padding:12px!important}}
+@media(prefers-reduced-motion:reduce){.al-ci *, .al-ci *:before,.al-ci *:after{animation:none!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}

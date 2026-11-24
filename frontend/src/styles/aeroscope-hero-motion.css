@@ -1,0 +1,134 @@
+/* AeroScope India: independent satellite + cloud motion overlay.
+ * Complements aeroscope-hero.css without changing the layout on other pages.
+ * Source artwork is a cleaned map image, NOT a scientific observation map. */
+
+/* Keep the 3D India landmass steady. The old image-scale animation moved the map too. */
+.as-hero .as-hero__image {
+  animation: none !important;
+  transform: none !important;
+  will-change: auto;
+}
+
+/* This is a full-canvas transparent image. Using the same cover geometry as
+   the map means the satellite lines up on desktop, tablet and mobile. */
+.as-hero .as-hero__satellite {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  transform: translate3d(0, 0, 0);
+  filter: drop-shadow(0 5px 9px rgba(47, 106, 113, .13));
+  animation: as-satellite-hover 6.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Four translucent, multi-lobed clouds drift in different directions.
+   Everything is pointer-events:none, and text always stays above them. */
+.as-hero .as-hero__cloud {
+  z-index: 2;
+  background:
+    radial-gradient(ellipse at 21% 66%, rgba(255,255,255,.92) 0%, rgba(255,255,255,.55) 20%, transparent 49%),
+    radial-gradient(ellipse at 47% 43%, rgba(255,255,255,.87) 0%, rgba(255,255,255,.47) 27%, transparent 55%),
+    radial-gradient(ellipse at 73% 60%, rgba(255,255,255,.84) 0%, rgba(255,255,255,.45) 26%, transparent 54%);
+  border-radius: 50%;
+  filter: blur(15px);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.as-hero .as-hero__cloud--one {
+  width: 500px;
+  height: 175px;
+  top: 23%;
+  right: -11%;
+  opacity: .66;
+  animation: as-cloud-travel-one 27s ease-in-out infinite alternate;
+}
+.as-hero .as-hero__cloud--two {
+  width: 450px;
+  height: 164px;
+  bottom: 7%;
+  right: 8%;
+  opacity: .52;
+  animation: as-cloud-travel-two 33s ease-in-out infinite alternate;
+}
+.as-hero .as-hero__cloud--three {
+  width: 345px;
+  height: 125px;
+  top: 41%;
+  right: 37%;
+  opacity: .34;
+  animation: as-cloud-travel-three 25s ease-in-out infinite alternate;
+}
+.as-hero .as-hero__cloud--four {
+  width: 400px;
+  height: 150px;
+  bottom: -4%;
+  left: 31%;
+  opacity: .39;
+  animation: as-cloud-travel-four 38s ease-in-out infinite alternate;
+}
+
+/* Avoid an extra decorative box on the far-right edge. Keep the scientific
+   disclaimer subtle and attached to the real homepage text. */
+.as-hero .as-hero__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 0;
+  color: #809b97;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+@keyframes as-satellite-hover {
+  0%, 100% { transform: translate3d(0, 1px, 0); }
+  50% { transform: translate3d(4px, -13px, 0); }
+}
+@keyframes as-cloud-travel-one {
+  from { transform: translate3d(28px, -4px, 0); opacity: .52; }
+  to { transform: translate3d(-108px, 17px, 0); opacity: .69; }
+}
+@keyframes as-cloud-travel-two {
+  from { transform: translate3d(-19px, 7px, 0); opacity: .38; }
+  to { transform: translate3d(98px, -19px, 0); opacity: .60; }
+}
+@keyframes as-cloud-travel-three {
+  from { transform: translate3d(50px, 7px, 0); opacity: .23; }
+  to { transform: translate3d(-74px, -15px, 0); opacity: .42; }
+}
+@keyframes as-cloud-travel-four {
+  from { transform: translate3d(-70px, 11px, 0); opacity: .28; }
+  to { transform: translate3d(85px, -16px, 0); opacity: .42; }
+}
+
+@media (max-width: 660px) {
+  .as-hero .as-hero__satellite {
+    position: absolute;
+    left: -81%;
+    bottom: 0;
+    top: auto;
+    width: 190%;
+    height: 100%;
+    max-width: none;
+    object-fit: fill;
+  }
+  .as-hero .as-hero__note {font-size: 9px; margin-top: 14px;}
+  .as-hero .as-hero__cloud--one {top: auto;bottom: 13%;right: -28%;opacity: .52;}
+  .as-hero .as-hero__cloud--three {top: auto;bottom: 23%;right: 23%;}
+  .as-hero .as-hero__cloud--four {left: -30%;bottom: 5%;}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .as-hero .as-hero__satellite,
+  .as-hero .as-hero__cloud {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto;
+  }
+}

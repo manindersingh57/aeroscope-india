@@ -17,3 +17,9 @@ backend/config/backend_config.json
 
 # Project-specific derived research summaries require permission review before publication.
 backend/data/analytics/
+
+# Private derived PCA cells, not approved for redistribution
+backend/data/pca/
+
+# Private generated model revision data; keep out of Git
+backend/data/model_revision.json
