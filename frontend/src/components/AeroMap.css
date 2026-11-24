@@ -1,0 +1,4 @@
+/* Dedicated map styling, independent of the app's Tailwind layers. */
+.as-hotspot-halo { filter: blur(5px) drop-shadow(0 0 12px currentColor); }
+.as-hotspot-core { filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 0 10px currentColor); }
+.leaflet-container { font-family: inherit; }

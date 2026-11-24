@@ -1,141 +1,241 @@
 import { useEffect, useRef, useState } from 'react'
-import * as maplibregl from 'maplibre-gl'
-import type { GeoJSONSource, Map as MapLibreMap, ExpressionSpecification } from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import * as L from 'leaflet'
+import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson'
+import 'leaflet/dist/leaflet.css'
+import './AeroMap.css'
 import type { HotspotFeature, ModelLegend } from '../lib/mapTypes'
 
-const EMPTY_GEOJSON = { type: 'FeatureCollection' as const, features: [] }
-const STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || 'https://demotiles.maplibre.org/style.json'
+const BOUNDARIES_URL = '/data/india-states.geojson'
+const TILE_URL = import.meta.env.VITE_RASTER_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const INDIA_BOUNDS: L.LatLngBoundsExpression = [[6, 68], [37.6, 97.8]]
+
+type BoundaryProps = { shapeName: string; shapeISO?: string }
+type StateCollection = FeatureCollection<Polygon | MultiPolygon, BoundaryProps>
+type StateEntry = { name: string; layer: L.Path; bounds: L.LatLngBounds }
 
 type Props = {
   features: HotspotFeature[]
   legend: ModelLegend | null
   selectedCoordinates: { lat: number; lon: number } | null
+  focusState: string
+  focusRevision: number
+  onStateSelect: (name: string) => void
   onCoordinateClick: (lat: number, lon: number) => void
   onHotspotClick: (hotspot: HotspotFeature) => void
 }
 
-export default function AeroMap({ features, legend, selectedCoordinates, onCoordinateClick, onHotspotClick }: Props) {
+function normalizeState(value: string): string {
+  const k = value.toLowerCase().normalize('NFKD')
+    .replace(/\b(state|union territory|nct of|national capital territory of)\b/g, '')
+    .replace(/[^a-z0-9]/g, '')
+  const aliases: Record<string, string> = {
+    orissa: 'odisha', uttaranchal: 'uttarakhand', pondicherry: 'puducherry',
+    delhi: 'delhi', jammuandkashmir: 'jammuandkashmir',
+    dadraandnagarhavelianddamananddiu: 'dadraandnagarhavelidamananddiu',
+  }
+  return aliases[k] ?? k
+}
+
+const normalStyle: L.PathOptions = {
+  color: '#277A82', weight: 1.1, opacity: 0.8, fillColor: '#12A5A2', fillOpacity: 0.035,
+}
+const hoveredStyle: L.PathOptions = {
+  color: '#0E9B88', weight: 2.4, opacity: 0.98, fillColor: '#5BE8C3', fillOpacity: 0.27,
+}
+const selectedStyle: L.PathOptions = {
+  color: '#096F6B', weight: 3.2, opacity: 1, fillColor: '#13B8A6', fillOpacity: 0.18,
+}
+
+export default function AeroMap({
+  features, legend, selectedCoordinates, focusState, focusRevision,
+  onStateSelect, onCoordinateClick, onHotspotClick,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<MapLibreMap | null>(null)
-  const selectedMarkerRef = useRef<maplibregl.Marker | null>(null)
-  const featuresRef = useRef<HotspotFeature[]>(features)
+  const mapRef = useRef<L.Map | null>(null)
+  const hotspotGroupRef = useRef<L.LayerGroup | null>(null)
+  const selectionRef = useRef<L.CircleMarker | null>(null)
+  const stateLayersRef = useRef<Map<string, StateEntry>>(new Map())
+  const selectedStateRef = useRef('')
+  const onStateRef = useRef(onStateSelect)
   const onCoordinateRef = useRef(onCoordinateClick)
   const onHotspotRef = useRef(onHotspotClick)
   const [ready, setReady] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
+  const [boundariesReady, setBoundariesReady] = useState(false)
+  const [hoveredName, setHoveredName] = useState<string | null>(null)
+  const [tileError, setTileError] = useState<string | null>(null)
+  const [boundaryError, setBoundaryError] = useState<string | null>(null)
+  const [stateFocusError, setStateFocusError] = useState<string | null>(null)
 
-  useEffect(() => { featuresRef.current = features }, [features])
+  useEffect(() => { onStateRef.current = onStateSelect }, [onStateSelect])
   useEffect(() => { onCoordinateRef.current = onCoordinateClick }, [onCoordinateClick])
   useEffect(() => { onHotspotRef.current = onHotspotClick }, [onHotspotClick])
 
   useEffect(() => {
     if (!containerRef.current) return
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: STYLE_URL,
-      center: [79.5, 22.5],
-      zoom: 3.6,
-      minZoom: 3,
-      maxZoom: 12,
-      attributionControl: false,
-    })
+    let disposed = false
+    let tileFailures = 0
+
+    // Leaflet renders without MapLibre's Web Worker. Map state and callbacks
+    // remain independent of the Flask analytical service.
+    const map = L.map(containerRef.current, { preferCanvas: false, zoomControl: true })
     mapRef.current = map
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right')
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+    map.fitBounds(INDIA_BOUNDS, { padding: [12, 12] })
 
-    function onLoad() {
-      map.addSource('aeroscope-hotspots', { type: 'geojson', data: EMPTY_GEOJSON })
-      map.addLayer({
-        id: 'aeroscope-hotspots-circles',
-        type: 'circle',
-        source: 'aeroscope-hotspots',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 5.5, 7, 10, 12, 15],
-          'circle-color': '#E76F51',
-          'circle-opacity': 0.83,
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1.4,
-        },
-      })
-      setReady(true)
-    }
-    function onMapClick(event: maplibregl.MapMouseEvent) {
-      const matches = map.getLayer('aeroscope-hotspots-circles')
-        ? map.queryRenderedFeatures(event.point, { layers: ['aeroscope-hotspots-circles'] })
-        : []
-      const id = matches[0]?.id
-      if (id !== undefined && id !== null) {
-        const feature = featuresRef.current.find((f) => String(f.id) === String(id))
-        if (feature) {
-          onHotspotRef.current(feature)
-          return
+    const tiles = L.tileLayer(TILE_URL, {
+      maxZoom: 19,
+      minZoom: 3,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      crossOrigin: true,
+    }).addTo(map)
+    tiles.on('tileerror', () => {
+      tileFailures += 1
+      if (!disposed && tileFailures >= 4) setTileError('Basemap tiles could not load. Check access to the tile provider in the browser Network tab.')
+    })
+    tiles.on('tileload', () => {
+      tileFailures = 0
+      if (!disposed) setTileError(null)
+    })
+    // Keep hotspot dots above state polygons, even when a state is hovered.
+    const hotspotPane = map.createPane('aeroscope-hotspots')
+    hotspotPane.style.zIndex = '450'
+    hotspotGroupRef.current = L.layerGroup().addTo(map)
+    map.on('click', (event: L.LeafletMouseEvent) => {
+      onCoordinateRef.current(event.latlng.lat, event.latlng.lng)
+    })
+    setReady(true)
+
+    async function loadStateBoundaries(): Promise<void> {
+      try {
+        const response = await fetch(BOUNDARIES_URL)
+        if (!response.ok) throw new Error(`${BOUNDARIES_URL} returned HTTP ${response.status}`)
+        const data = await response.json() as StateCollection
+        if (disposed) return
+        if (data.type !== 'FeatureCollection' || !Array.isArray(data.features) || !data.features.length) {
+          throw new Error('Empty or invalid state boundary GeoJSON')
         }
+        const layer = L.geoJSON(data, {
+          style: () => normalStyle,
+          onEachFeature: (feature, polygonLayer) => {
+            const name = String(feature.properties?.shapeName ?? '')
+            if (!name || !(polygonLayer instanceof L.Polygon)) return
+            const entry: StateEntry = { name, layer: polygonLayer, bounds: polygonLayer.getBounds() }
+            stateLayersRef.current.set(normalizeState(name), entry)
+            polygonLayer.on('mouseover', () => {
+              if (normalizeState(name) !== selectedStateRef.current) polygonLayer.setStyle(hoveredStyle)
+              setHoveredName(name)
+              polygonLayer.bringToFront()
+            })
+            polygonLayer.on('mouseout', () => {
+              polygonLayer.setStyle(normalizeState(name) === selectedStateRef.current ? selectedStyle : normalStyle)
+              setHoveredName(null)
+            })
+            polygonLayer.on('click', (event: L.LeafletMouseEvent) => {
+              L.DomEvent.stopPropagation(event.originalEvent)
+              onStateRef.current(name)
+            })
+          },
+        }).addTo(map)
+        if (!disposed && layer.getLayers().length > 0) {
+          setBoundariesReady(true)
+          setBoundaryError(null)
+        }
+      } catch (error) {
+        if (!disposed) setBoundaryError(error instanceof Error ? error.message : 'Could not load state boundaries')
       }
-      onCoordinateRef.current(event.lngLat.lat, event.lngLat.lng)
     }
-    function onPointerMove(event: maplibregl.MapMouseEvent) {
-      const matches = map.getLayer('aeroscope-hotspots-circles')
-        ? map.queryRenderedFeatures(event.point, { layers: ['aeroscope-hotspots-circles'] })
-        : []
-      map.getCanvas().style.cursor = matches.length ? 'pointer' : 'crosshair'
-    }
-    function onMapError() {
-      setMapError('The basemap could not load. Check your internet connection or configure VITE_MAP_STYLE_URL.')
-    }
-
-    map.on('load', onLoad)
-    map.on('click', onMapClick)
-    map.on('mousemove', onPointerMove)
-    map.on('error', onMapError)
-
+    void loadStateBoundaries()
+    const resizeTimer = window.setTimeout(() => { if (!disposed) map.invalidateSize() }, 180)
     return () => {
-      map.off('load', onLoad)
-      map.off('click', onMapClick)
-      map.off('mousemove', onPointerMove)
-      map.off('error', onMapError)
+      disposed = true
+      window.clearTimeout(resizeTimer)
       map.remove()
       mapRef.current = null
+      hotspotGroupRef.current = null
+      stateLayersRef.current.clear()
     }
   }, [])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || !ready) return
-    const source = map.getSource('aeroscope-hotspots') as GeoJSONSource | undefined
-    if (!source) return
-    source.setData({ type: 'FeatureCollection', features } as Parameters<GeoJSONSource['setData']>[0])
-    const colorStops: string[] = []
-    for (const cluster of legend?.clusters ?? []) {
-      colorStops.push(cluster.name, cluster.color)
+    const group = hotspotGroupRef.current
+    if (!ready || !group) return
+    group.clearLayers()
+    for (const item of features) {
+      const [lon, lat] = item.geometry.coordinates
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+      const aod = item.properties.mean_aod
+      const color = legend?.clusters.find((c) => c.name === item.properties.cluster_name)?.color ?? '#F59E0B'
+      // Higher historical AOD gives a larger halo, but never represents real-time AQI.
+      const factor = typeof aod === 'number' && Number.isFinite(aod) ? Math.max(0.7, Math.min(2, aod)) : 0.8
+      const halo = L.circleMarker([lat, lon], {
+        radius: 15 + factor * 6, color, fillColor: color, fillOpacity: 0.10,
+        opacity: 0, weight: 0, className: 'as-hotspot-halo', pane: 'aeroscope-hotspots',
+        interactive: false,
+      }).addTo(group)
+      halo.bringToBack()
+      const core = L.circleMarker([lat, lon], {
+        radius: 5 + factor * 1.5, color: '#ffffff', weight: 1.2,
+        fillColor: color, fillOpacity: 0.98, bubblingMouseEvents: false,
+        className: 'as-hotspot-core', pane: 'aeroscope-hotspots',
+      }).addTo(group)
+      const label = `${item.properties.cluster_name} · historical mean AOD: ${
+        typeof aod === 'number' && Number.isFinite(aod) ? aod.toFixed(3) : 'unavailable'}`
+      core.bindTooltip(label, { direction: 'top' })
+      core.on('click', () => onHotspotRef.current(item))
     }
-    const expression: string | ExpressionSpecification = colorStops.length > 0
-      ? (['match', ['get', 'cluster_name'], ...colorStops, '#D97706'] as unknown as ExpressionSpecification)
-      : '#D97706'
-    map.setPaintProperty('aeroscope-hotspots-circles', 'circle-color', expression)
   }, [features, legend, ready])
 
   useEffect(() => {
-    selectedMarkerRef.current?.remove()
-    selectedMarkerRef.current = null
-    if (!selectedCoordinates || !mapRef.current) return
-    const marker = new maplibregl.Marker({ color: '#0d766d' })
-      .setLngLat([selectedCoordinates.lon, selectedCoordinates.lat])
-      .addTo(mapRef.current)
-    selectedMarkerRef.current = marker
+    const map = mapRef.current
+    if (!map || !ready) return
+    selectionRef.current?.remove()
+    selectionRef.current = null
+    if (!selectedCoordinates) return
+    const marker = L.circleMarker([selectedCoordinates.lat, selectedCoordinates.lon], {
+      radius: 8, color: '#ffffff', weight: 2.5, fillColor: '#0D766D', fillOpacity: 1,
+      bubblingMouseEvents: false, pane: 'aeroscope-hotspots',
+    }).addTo(map)
+    selectionRef.current = marker
+    map.flyTo([selectedCoordinates.lat, selectedCoordinates.lon], Math.max(map.getZoom(), 7), { duration: 0.85 })
     return () => {
       marker.remove()
-      if (selectedMarkerRef.current === marker) selectedMarkerRef.current = null
+      if (selectionRef.current === marker) selectionRef.current = null
     }
-  }, [selectedCoordinates])
+  }, [selectedCoordinates, ready])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    selectedStateRef.current = normalizeState(focusState)
+    for (const [key, entry] of stateLayersRef.current) {
+      entry.layer.setStyle(key === selectedStateRef.current ? selectedStyle : normalStyle)
+    }
+    if (!focusState.trim()) {
+      setStateFocusError(null)
+      if (focusRevision) map.flyToBounds(INDIA_BOUNDS, { padding: [18, 18], duration: 0.8 })
+      return
+    }
+    if (!boundariesReady) return
+    const entry = stateLayersRef.current.get(normalizeState(focusState))
+    if (!entry) {
+      setStateFocusError(`Could not find "${focusState}" in the state boundary layer.`)
+      return
+    }
+    setStateFocusError(null)
+    map.flyToBounds(entry.bounds, { padding: [55, 55], maxZoom: 7, duration: 1.1 })
+  }, [focusState, focusRevision, ready, boundariesReady])
 
   return (
     <div className="relative h-[62vh] min-h-[450px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 lg:h-[680px]">
-      <div ref={containerRef} aria-label="Interactive map of India with historical aerosol hotspot centres" className="absolute inset-0" />
-      {mapError && <div role="alert" className="absolute bottom-10 left-3 right-3 z-10 rounded-xl bg-white/95 p-3 text-sm text-rose-700 shadow">{mapError}</div>}
-      <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-56 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs leading-5 text-slate-600 shadow-sm backdrop-blur">
-        <strong className="block text-slate-800">Historical research map</strong>
-        Click an empty location to inspect its nearest study grid cell. Circles mark hotspot centres, not hotspot boundaries.
+      <div ref={containerRef} aria-label="Interactive map of India with state boundaries and glowing historical aerosol hotspot centres" className="absolute inset-0 z-0 w-full h-full" />
+      <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-60 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs leading-5 text-slate-700 shadow-sm backdrop-blur">
+        <strong className="block text-slate-900">Interactive historical aerosol atlas</strong>
+        Hover a state to highlight it. Select a state to zoom in. Glowing points mark historical hotspot centres, not live pollution readings.
+        {hoveredName && <div aria-live="polite" className="mt-2 rounded-md bg-teal-50 px-2 py-1 font-semibold text-teal-900">{hoveredName}</div>}
+      </div>
+      <div className="pointer-events-none absolute bottom-10 left-3 right-3 z-10 space-y-2">
+        {tileError && <div role="alert" className="rounded-xl border border-rose-200 bg-white/95 p-3 text-sm text-rose-700">{tileError}</div>}
+        {boundaryError && <div role="alert" className="rounded-xl border border-amber-200 bg-white/95 p-3 text-xs text-amber-900">State boundaries unavailable. Run <code>python tools/fetch_india_states.py</code> from the repository root. {boundaryError}</div>}
+        {stateFocusError && <div role="alert" className="rounded-xl border border-amber-200 bg-white/95 p-3 text-xs text-amber-900">{stateFocusError}</div>}
       </div>
     </div>
   )

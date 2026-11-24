@@ -1,0 +1,313 @@
+import { useEffect, useRef, useState } from 'react'
+import * as maplibregl from 'maplibre-gl'
+import type { Map as MapLibreMap, GeoJSONSource, ExpressionSpecification } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+
+// Vite bundles the MapLibre v6 worker separately. Supply the generated asset
+// URL before constructing the map to avoid a blank map/worker-load error.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
+import type { HotspotFeature, ModelLegend } from '../lib/mapTypes'
+
+// State boundaries are a separate, open administrative reference layer.
+// The historical hotspot features are only supplied by the existing Flask API.
+const STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty'
+const BOUNDARIES_URL = '/data/india-states.geojson'
+const EMPTY_GEOJSON = { type: 'FeatureCollection' as const, features: [] }
+const ALL_INDIA: [[number, number], [number, number]] = [[68, 6], [97.8, 37.6]]
+
+const normalizeState = (s: string): string => {
+  const key = s.toLowerCase().normalize('NFKD').replace(/\b(state|union territory|nct of|national capital territory of)\b/g, '').replace(/[^a-z0-9]/g, '')
+  const aliases: Record<string, string> = {
+    orissa: 'odisha', uttaranchal: 'uttarakhand', pondicherry: 'puducherry',
+    delhi: 'delhi', jammuandkashmir: 'jammuandkashmir',
+    dadraandnagarhavelianddamananddiu: 'dadraandnagarhavelidamananddiu',
+  }
+  return aliases[key] ?? key
+}
+
+type StateGeometry = { type: 'Polygon' | 'MultiPolygon'; coordinates: unknown }
+type StateFeature = { type: 'Feature'; properties: { shapeName: string; shapeISO?: string }; geometry: StateGeometry }
+type StateCollection = { type: 'FeatureCollection'; features: StateFeature[] }
+
+type Props = {
+  features: HotspotFeature[]
+  legend: ModelLegend | null
+  selectedCoordinates: { lat: number; lon: number } | null
+  focusState: string
+  focusRevision: number
+  onStateSelect: (name: string) => void
+  onCoordinateClick: (lat: number, lon: number) => void
+  onHotspotClick: (hotspot: HotspotFeature) => void
+}
+
+function stateBounds(feature: StateFeature): maplibregl.LngLatBounds {
+  const bounds = new maplibregl.LngLatBounds()
+  function walk(value: unknown): void {
+    if (!Array.isArray(value)) return
+    if (value.length >= 2 && typeof value[0] === 'number' && typeof value[1] === 'number') {
+      bounds.extend([value[0], value[1]])
+    } else {
+      for (const child of value) walk(child)
+    }
+  }
+  walk(feature.geometry.coordinates)
+  return bounds
+}
+
+function clusterColor(legend: ModelLegend | null): ExpressionSpecification | string {
+  const stops: string[] = []
+  for (const item of legend?.clusters ?? []) stops.push(item.name, item.color)
+  return stops.length
+    ? (['match', ['get', 'cluster_name'], ...stops, '#F59E0B'] as unknown as ExpressionSpecification)
+    : '#F59E0B'
+}
+
+export default function AeroMap({
+  features, legend, selectedCoordinates, focusState, focusRevision,
+  onStateSelect, onCoordinateClick, onHotspotClick,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const markerRef = useRef<maplibregl.Marker | null>(null)
+  const popupRef = useRef<maplibregl.Popup | null>(null)
+  const featuresRef = useRef(features)
+  const onStateRef = useRef(onStateSelect)
+  const onCoordinateRef = useRef(onCoordinateClick)
+  const onHotspotRef = useRef(onHotspotClick)
+  const stateFeaturesRef = useRef<StateFeature[]>([])
+  const hoveredRef = useRef<string>('')
+  const [ready, setReady] = useState(false)
+  const [boundariesReady, setBoundariesReady] = useState(false)
+  const [basemapError, setBasemapError] = useState<string | null>(null)
+  const [boundaryError, setBoundaryError] = useState<string | null>(null)
+  const [stateFocusError, setStateFocusError] = useState<string | null>(null)
+  const [hoveredName, setHoveredName] = useState<string | null>(null)
+
+  useEffect(() => { featuresRef.current = features }, [features])
+  useEffect(() => { onStateRef.current = onStateSelect }, [onStateSelect])
+  useEffect(() => { onCoordinateRef.current = onCoordinateClick }, [onCoordinateClick])
+  useEffect(() => { onHotspotRef.current = onHotspotClick }, [onHotspotClick])
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    let disposed = false
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: STYLE_URL,
+      center: [79.5, 22.5],
+      zoom: 3.6,
+      minZoom: 3,
+      maxZoom: 12,
+      attributionControl: false,
+    })
+    mapRef.current = map
+    popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 15 })
+    map.addControl(new maplibregl.NavigationControl(), 'top-right')
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
+
+    async function installStates() {
+      try {
+        const response = await fetch(BOUNDARIES_URL)
+        if (!response.ok) throw new Error(`Missing ${BOUNDARIES_URL} (HTTP ${response.status})`)
+        const data: StateCollection = await response.json() as StateCollection
+        if (disposed) return
+        if (data.type !== 'FeatureCollection' || !Array.isArray(data.features) || !data.features.length) {
+          throw new Error('Invalid state boundary GeoJSON')
+        }
+        const valid = data.features.filter((f) => f?.properties?.shapeName && f?.geometry?.coordinates)
+        if (!valid.length) throw new Error('No named state geometries found')
+        stateFeaturesRef.current = valid
+        map.addSource('as-states', { type: 'geojson', data: { type: 'FeatureCollection', features: valid } as unknown as Parameters<GeoJSONSource['setData']>[0] })
+        const before = 'as-glow-outer'
+        map.addLayer({ id: 'as-state-fills', type: 'fill', source: 'as-states', paint: {
+          'fill-color': '#0A8C9A', 'fill-opacity': 0.035,
+        } }, before)
+        map.addLayer({ id: 'as-state-hover', type: 'fill', source: 'as-states',
+          filter: ['==', ['get', 'shapeName'], '__none__'],
+          paint: { 'fill-color': '#38E6BE', 'fill-opacity': 0.28 },
+        }, before)
+        map.addLayer({ id: 'as-state-selected', type: 'fill', source: 'as-states',
+          filter: ['==', ['get', 'shapeName'], '__none__'],
+          paint: { 'fill-color': '#13B8A6', 'fill-opacity': 0.2 },
+        }, before)
+        map.addLayer({ id: 'as-state-lines', type: 'line', source: 'as-states', paint: {
+          'line-color': '#287D84', 'line-width': 1.1, 'line-opacity': 0.7,
+        } }, before)
+        map.addLayer({ id: 'as-selected-outline', type: 'line', source: 'as-states',
+          filter: ['==', ['get', 'shapeName'], '__none__'],
+          paint: { 'line-color': '#0F766E', 'line-width': 3, 'line-opacity': 0.96 },
+        }, before)
+        setBoundariesReady(true)
+        setBoundaryError(null)
+      } catch (error) {
+        if (!disposed) setBoundaryError(error instanceof Error ? error.message : 'Cannot load state boundaries')
+      }
+    }
+
+    function onLoad(): void {
+      map.addSource('as-hotspots', { type: 'geojson', data: EMPTY_GEOJSON })
+      // Three concentric MapLibre circle layers make an inexpensive glow.
+      // Halo brightness is linked to the historical mean AOD, not real-time AQI.
+      map.addLayer({ id: 'as-glow-outer', source: 'as-hotspots', type: 'circle', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 13, 7, 22, 12, 34],
+        'circle-color': '#F59E0B',
+        'circle-blur': 0.94,
+        'circle-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'mean_aod'], 0], 0, 0.07, 0.5, 0.2, 1.2, 0.35, 3, 0.55],
+      } })
+      map.addLayer({ id: 'as-glow-inner', source: 'as-hotspots', type: 'circle', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 8, 7, 13, 12, 18],
+        'circle-color': '#F59E0B', 'circle-blur': 0.7, 'circle-opacity': 0.32,
+      } })
+      map.addLayer({ id: 'as-glow-core', source: 'as-hotspots', type: 'circle', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3.5, 7, 6, 12, 8],
+        'circle-color': '#F59E0B', 'circle-opacity': 0.94,
+        'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.0,
+      } })
+      setReady(true)
+      void installStates()
+    }
+
+    function onClick(event: maplibregl.MapMouseEvent): void {
+      const hitGlow = map.getLayer('as-glow-core')
+        ? map.queryRenderedFeatures(event.point, { layers: ['as-glow-core'] }) : []
+      if (hitGlow.length) {
+        const rawId = hitGlow[0].id
+        const found = featuresRef.current.find((f) => String(f.id) === String(rawId))
+        if (found) { onHotspotRef.current(found); return }
+      }
+      if (map.getLayer('as-state-fills')) {
+        const states = map.queryRenderedFeatures(event.point, { layers: ['as-state-fills'] })
+        const name = states[0]?.properties?.shapeName as string | undefined
+        if (name) onStateRef.current(name)
+      }
+      // Preserve the original location inspection behaviour when clicking the map.
+      onCoordinateRef.current(event.lngLat.lat, event.lngLat.lng)
+    }
+
+    function onMove(event: maplibregl.MapMouseEvent): void {
+      const dots = map.getLayer('as-glow-core')
+        ? map.queryRenderedFeatures(event.point, { layers: ['as-glow-core'] }) : []
+      if (dots.length) {
+        const p = dots[0].properties ?? {}
+        const aod = Number(p.mean_aod)
+        const label = `${String(p.cluster_name ?? 'Aerosol cluster')} · historical mean AOD: ${Number.isFinite(aod) ? aod.toFixed(3) : 'unavailable'}`
+        popupRef.current?.setLngLat(event.lngLat).setText(label).addTo(map)
+      } else popupRef.current?.remove()
+      const states = map.getLayer('as-state-fills')
+        ? map.queryRenderedFeatures(event.point, { layers: ['as-state-fills'] }) : []
+      const name = (states[0]?.properties?.shapeName as string | undefined) || ''
+      if (name !== hoveredRef.current) {
+        hoveredRef.current = name
+        setHoveredName(name || null)
+        if (map.getLayer('as-state-hover')) {
+          map.setFilter('as-state-hover', ['==', ['get', 'shapeName'], name || '__none__'])
+        }
+      }
+      map.getCanvas().style.cursor = dots.length || name ? 'pointer' : 'crosshair'
+    }
+
+    function onLeave(): void {
+      popupRef.current?.remove()
+      hoveredRef.current = ''
+      setHoveredName(null)
+      if (map.getLayer('as-state-hover')) {
+        map.setFilter('as-state-hover', ['==', ['get', 'shapeName'], '__none__'])
+      }
+      map.getCanvas().style.cursor = ''
+    }
+
+    function onError(event: maplibregl.ErrorEvent): void {
+      const msg = event.error?.message || 'Unknown map loading error'
+      // The boundary fetch is independent of MapLibre's basemap error events.
+      if (!disposed) setBasemapError(`Map style or tiles could not load: ${msg}`)
+    }
+
+    map.on('load', onLoad)
+    map.on('click', onClick)
+    map.on('mousemove', onMove)
+    map.on('mouseout', onLeave)
+    map.on('error', onError)
+
+    return () => {
+      disposed = true
+      popupRef.current?.remove()
+      map.off('load', onLoad)
+      map.off('click', onClick)
+      map.off('mousemove', onMove)
+      map.off('mouseout', onLeave)
+      map.off('error', onError)
+      map.remove()
+      mapRef.current = null
+      stateFeaturesRef.current = []
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !mapRef.current) return
+    const map = mapRef.current
+    const source = map.getSource('as-hotspots') as GeoJSONSource | undefined
+    source?.setData({ type: 'FeatureCollection', features } as Parameters<GeoJSONSource['setData']>[0])
+    const paint = clusterColor(legend)
+    for (const layer of ['as-glow-outer', 'as-glow-inner', 'as-glow-core']) {
+      if (map.getLayer(layer)) map.setPaintProperty(layer, 'circle-color', paint)
+    }
+  }, [features, legend, ready])
+
+  useEffect(() => {
+    if (!ready || !mapRef.current) return
+    markerRef.current?.remove()
+    markerRef.current = null
+    if (!selectedCoordinates) return
+    const map = mapRef.current
+    const marker = new maplibregl.Marker({ color: '#0D766D' })
+      .setLngLat([selectedCoordinates.lon, selectedCoordinates.lat]).addTo(map)
+    markerRef.current = marker
+    map.flyTo({ center: [selectedCoordinates.lon, selectedCoordinates.lat], zoom: Math.max(map.getZoom(), 7), essential: true, duration: 850 })
+    return () => {
+      marker.remove()
+      if (markerRef.current === marker) markerRef.current = null
+    }
+  }, [ready, selectedCoordinates])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    if (!focusState.trim()) {
+      setStateFocusError(null)
+      for (const layer of ['as-state-selected', 'as-selected-outline']) {
+        if (map.getLayer(layer)) map.setFilter(layer, ['==', ['get', 'shapeName'], '__none__'])
+      }
+      if (focusRevision) map.fitBounds(ALL_INDIA, { padding: 45, duration: 800 })
+      return
+    }
+    if (!boundariesReady) return
+    const selected = stateFeaturesRef.current.find((f) => normalizeState(f.properties.shapeName) === normalizeState(focusState))
+    if (!selected) {
+      setStateFocusError(`"${focusState}" wasn't found in the boundary layer. Try a state name such as Punjab, Haryana or Rajasthan.`)
+      return
+    }
+    setStateFocusError(null)
+    for (const layer of ['as-state-selected', 'as-selected-outline']) {
+      map.setFilter(layer, ['==', ['get', 'shapeName'], selected.properties.shapeName])
+    }
+    const bounds = stateBounds(selected)
+    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 65, maxZoom: 7, duration: 1100 })
+  }, [ready, boundariesReady, focusState, focusRevision])
+
+  return (
+    <div className="relative h-[62vh] min-h-[450px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 lg:h-[680px]">
+      <div ref={containerRef} aria-label="Interactive map of India with state outlines and glowing historical AOD hotspot centres" className="absolute inset-0" />
+      <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-60 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs leading-5 text-slate-700 shadow-sm backdrop-blur">
+        <strong className="block text-slate-900">Interactive historical aerosol atlas</strong>
+        Hover a state to highlight it. Select a state to zoom in. Glowing points mark historical hotspot centres, not live pollution readings.
+        {hoveredName && <div aria-live="polite" className="mt-2 rounded-md bg-teal-50 px-2 py-1 font-semibold text-teal-900">{hoveredName}</div>}
+      </div>
+      <div className="pointer-events-none absolute bottom-10 left-3 right-3 z-10 space-y-2">
+        {basemapError && <div role="alert" className="rounded-xl border border-rose-200 bg-white/95 p-3 text-sm text-rose-700 shadow">{basemapError}</div>}
+        {boundaryError && <div role="alert" className="rounded-xl border border-amber-200 bg-white/95 p-3 text-xs text-amber-900 shadow">State boundaries unavailable. Run <code>python tools/fetch_india_states.py</code> at the project root, then rebuild/redeploy. {boundaryError}</div>}
+        {stateFocusError && <div role="alert" className="rounded-xl border border-amber-200 bg-white/95 p-3 text-xs text-amber-900 shadow">{stateFocusError}</div>}
+      </div>
+    </div>
+  )
+}

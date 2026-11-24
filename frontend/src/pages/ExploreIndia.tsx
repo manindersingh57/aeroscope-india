@@ -21,6 +21,7 @@ export default function ExploreIndia() {
   const [model, setModel] = useState<ModelId>('model_a')
   const [draftState, setDraftState] = useState('')
   const [stateFilter, setStateFilter] = useState('')
+  const [focusRevision, setFocusRevision] = useState(0)
   const [clusterName, setClusterName] = useState('')
   const [minCells, setMinCells] = useState(1)
   const [hotspots, setHotspots] = useState<HotspotsCollection | null>(null)
@@ -186,10 +187,12 @@ export default function ExploreIndia() {
                   </button>
                 ))}
               </div>
-              <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); setStateFilter(draftState.trim()) }}>
-                <label className="block text-xs font-semibold text-slate-600" htmlFor="state-search">Filter hotspot centres by state</label>
-                <input id="state-search" value={draftState} onChange={(event) => setDraftState(event.target.value)} placeholder="e.g. Punjab" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-600" />
-                <button type="submit" className="w-full rounded-lg bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205863]">Apply state filter</button>
+              <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); setStateFilter(draftState.trim()); setFocusRevision((v) => v + 1) }}>
+                <label className="block text-xs font-semibold text-slate-600" htmlFor="state-search">Find a state · zoom and highlight</label>
+                <input id="state-search" value={draftState} onChange={(event) => setDraftState(event.target.value)} placeholder="e.g. Punjab" list="as-indian-states" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-600" />
+                <datalist id="as-indian-states">{["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"].map((name) => <option key={name} value={name}/>)}</datalist>
+                <button type="submit" className="w-full rounded-lg bg-[#123d48] px-4 py-2 text-sm font-semibold text-white hover:bg-[#205863]">Zoom to state & filter hotspots</button>
+                <button type="button" onClick={() => { setStateFilter(''); setDraftState(''); setFocusRevision((v) => v + 1) }} className="w-full rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-50">Reset to all India</button>
               </form>
               <label className="mt-4 block text-xs font-semibold text-slate-600" htmlFor="cluster-filter">Cluster</label>
               <div className="relative mt-2">
@@ -220,14 +223,14 @@ export default function ExploreIndia() {
           </aside>
 
           <section aria-label="India interactive map" className="min-w-0 space-y-3">
-            <AeroMap features={allowed ? displayedFeatures : []} legend={activeModel} selectedCoordinates={coordinates} onCoordinateClick={chooseCoordinate} onHotspotClick={(hotspot) => { setSelectedHotspot(hotspot); setCoordinates(null) }} />
+            <AeroMap features={allowed ? displayedFeatures : []} legend={activeModel} selectedCoordinates={coordinates} focusState={stateFilter} focusRevision={focusRevision} onStateSelect={(stateName) => { setDraftState(stateName); setStateFilter(stateName); setFocusRevision((v) => v + 1) }} onCoordinateClick={chooseCoordinate} onHotspotClick={(hotspot) => { setSelectedHotspot(hotspot); setCoordinates(null) }} />
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
               <span><strong className="text-slate-900">{displayedFeatures.length}</strong> of <strong className="text-slate-900">{hotspots?.pagination.total ?? 0}</strong> hotspot centres shown · {hotspotsLoading ? 'Loading…' : 'Model ' + (model === 'model_a' ? 'A' : 'B')}</span>
               {hotspots?.pagination.has_more && allowed && <button type="button" onClick={loadMore} disabled={moreLoading} className="rounded-lg border border-teal-200 px-3 py-1.5 font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-60">{moreLoading ? 'Loading…' : 'Load more markers'}</button>}
             </div>
             {hotspotsError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">Hotspot API: {hotspotsError}</p>}
             {!hotspotsLoading && allowed && displayedFeatures.length === 0 && !hotspotsError && <p className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">No hotspot centres match the current filters. Try clearing the state or cluster filter.</p>}
-            <p className="px-1 text-xs leading-5 text-slate-500">Hotspot points represent centres of connected historical aerosol regions. They do not show actual polygon footprints, emission sources, live air quality or PM2.5 concentrations. Basemap tiles are supplied by a third-party demonstration service.</p>
+            <p className="px-1 text-xs leading-5 text-slate-500">Glowing points represent centres of connected historical AOD regions; size and glow relate to recorded AOD, not ground-level PM2.5 or live AQI. State boundaries are an independent reference layer, not official survey boundaries. Basemap © OpenStreetMap contributors via OpenFreeMap; boundaries © geoBoundaries / DataMeet (CC BY 2.5 IN).</p>
           </section>
 
           <aside className="space-y-4">
