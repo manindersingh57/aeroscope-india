@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Activity, ArrowLeft, BarChart3, BookOpen, Database, FlaskConical,
-  Info, RefreshCw, ShieldAlert,
+  Activity, ArrowRight, ArrowUpRight, BarChart3, BookOpen, CircleAlert,
+  Database, FlaskConical, Info, Layers3, LockKeyhole, RefreshCw,
+  ShieldAlert, SlidersHorizontal, Sparkles,
 } from 'lucide-react'
 import {
   Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart,
-  ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip,
-  XAxis, YAxis,
+  ReferenceLine, ResponsiveContainer, Scatter, ScatterChart,
+  Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { aeroscopeApi, API_BASE, type Capabilities, type Model } from '../lib/aeroscopeApi'
 import type {
   ClusterProfile, ModelMetricsResponse, ModelProfilesResponse,
   ModelComparisonsResponse, ModelRobustnessResponse, ModelPCAResponse,
 } from '../lib/modelTypes'
+import '../styles/aeroscope-lab.css'
 
 type LabData = {
   metrics: ModelMetricsResponse | null
@@ -23,63 +25,92 @@ type LabData = {
   pca: ModelPCAResponse | null
 }
 type DataKey = keyof LabData
+type ScoreMode = 'silhouette' | 'davies_bouldin'
 const DATA_KEYS: DataKey[] = ['metrics', 'profiles', 'comparisons', 'robustness', 'pca']
-const EMPTY_DATA: LabData = {
-  metrics: null, profiles: null, comparisons: null, robustness: null, pca: null,
-}
-const MODEL_INFO: Record<Model, { name: string; description: string; features: string }> = {
+const EMPTY_DATA: LabData = { metrics: null, profiles: null, comparisons: null, robustness: null, pca: null }
+const MODEL_INFO: Record<Model, { title: string; tag: string; intro: string; feature: string; configuredK: number }> = {
   model_a: {
-    name: 'Broad Aerosol Loading',
-    description: 'Historical loading intensity and variation across the Indian study grid.',
-    features: 'Overall AOD statistics and high-AOD frequency',
+    title: 'Broad Aerosol Loading', tag: 'GLOBAL INTENSITY',
+    intro: 'Explore the distribution and variability of historical aerosol loading.',
+    feature: 'Overall AOD statistics · high-AOD frequency', configuredK: 4,
   },
   model_b: {
-    name: 'Seasonal Aerosol Behaviour',
-    description: 'Historical differences between seasonal aerosol profiles.',
-    features: 'Overall AOD features and seasonal contrasts',
+    title: 'Seasonal Aerosol Behaviour', tag: 'SEASONAL SIGNATURES',
+    intro: 'Explore differences in seasonal aerosol characteristics across the study grid.',
+    feature: 'AOD features · seasonal contrasts', configuredK: 5,
   },
 }
-
 const format = (value: number | null | undefined, digits = 3) =>
   typeof value === 'number' && Number.isFinite(value)
     ? value.toLocaleString('en-IN', { maximumFractionDigits: digits })
-    : 'Not available'
-const percentage = (value: number | null | undefined, digits = 1) =>
-  typeof value === 'number' && Number.isFinite(value) ? `${format(value, digits)}%` : 'Not available'
-const getError = (value: unknown) => value instanceof Error ? value.message : 'Unable to retrieve results'
+    : '—'
+const percent = (value: number | null | undefined, digits = 1) =>
+  typeof value === 'number' && Number.isFinite(value) ? `${format(value, digits)}%` : '—'
+const errorText = (value: unknown) => value instanceof Error ? value.message : 'Unable to retrieve these results.'
 const profileColor = (profile: ClusterProfile) =>
-  /^#[\da-fA-F]{6}$/.test(profile.cluster_color) ? profile.cluster_color : '#147d82'
+  /^#[\da-fA-F]{6}$/.test(profile.cluster_color) ? profile.cluster_color : '#22b7a5'
+const tooltipStyle = { borderRadius: 13, border: '1px solid #e7efeb', background: '#fff', boxShadow: '0 10px 30px #294d4022', fontSize: 12 }
 
-function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-[#12333b]">{title}</h2>
-      {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
-      <div className="mt-5">{children}</div>
-    </section>
-  )
-}
-function Unavailable({ message }: { message?: string }) {
-  return <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">{message || 'This saved analysis is not available from the current backend.'}</p>
-}
-function Metric({ label, value, footnote }: { label: string; value: string; footnote?: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-[#f8fafb] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-[#123943]">{value}</p>
-      {footnote && <p className="mt-1 text-xs text-slate-500">{footnote}</p>}
+function LabCard({ index, title, description, action, className = '', children }: {
+  index: string; title: string; description?: string; action?: ReactNode; className?: string; children: ReactNode
+}) {
+  return <section className={`al-lab-card ${className}`}>
+    <div className="al-lab-card-head">
+      <div><span className="al-lab-card-index">{index}</span><h2>{title}</h2>{description && <p>{description}</p>}</div>
+      {action && <div className="al-lab-card-action">{action}</div>}
     </div>
-  )
+    {children}
+  </section>
+}
+function EmptyChart({ title = 'Scientific results unavailable', description }: { title?: string; description?: string }) {
+  return <div className="al-lab-chart-empty" role="status">
+    <div className="al-lab-empty-grid" aria-hidden="true" />
+    <div className="al-lab-empty-content"><LockKeyhole size={19} strokeWidth={1.65}/>
+      <strong>{title}</strong>
+      <span>{description ?? 'The chart will use verified values from the local research API when available.'}</span>
+    </div>
+  </div>
+}
+function StatCard({ icon, eyebrow, value, note, tone = 'teal' }: {
+  icon: ReactNode; eyebrow: string; value: string; note: string; tone?: 'teal' | 'amber' | 'violet' | 'blue'
+}) {
+  return <article className={`al-lab-stat al-lab-stat-${tone}`}>
+    <div className="al-lab-stat-header"><span>{eyebrow}</span><div className="al-lab-stat-icon">{icon}</div></div>
+    <strong>{value}</strong><small>{note}</small>
+  </article>
+}
+function Donut({ profiles }: { profiles: ClusterProfile[] }) {
+  const radius = 63, circumference = 2 * Math.PI * radius
+  const total = profiles.reduce((sum, profile) => sum + Math.max(0, profile.percentage), 0)
+  let offset = 0
+  return <div className="al-lab-donut" role="img" aria-label={profiles.length ? 'Cluster shares from the selected model profiles' : 'Cluster proportions not available'}>
+    <svg viewBox="0 0 180 180" aria-hidden="true">
+      <circle cx="90" cy="90" r={radius} stroke="#eaf2ee" strokeWidth="15" fill="none" />
+      {profiles.map((profile, i) => {
+        const share = total > 0 ? Math.max(0, profile.percentage) / total : 0
+        const length = share * circumference
+        const result = <circle key={`${profile.cluster_id}-${i}`} cx="90" cy="90" r={radius}
+          stroke={profileColor(profile)} strokeWidth="15" fill="none"
+          strokeDasharray={`${Math.max(0, length - 3)} ${circumference}`}
+          strokeDashoffset={-offset} transform="rotate(-90 90 90)" strokeLinecap="round" />
+        offset += length
+        return result
+      })}
+    </svg>
+    <div className="al-lab-donut-centre"><strong>{profiles.length ? format(profiles.length, 0) : '—'}</strong><span>identified<br/>clusters</span></div>
+  </div>
 }
 
 export default function ModelLaboratory() {
   const [model, setModel] = useState<Model>('model_a')
-  const [retry, setRetry] = useState(0)
+  const [attempt, setAttempt] = useState(0)
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null)
   const [data, setData] = useState<LabData>(EMPTY_DATA)
   const [errors, setErrors] = useState<Partial<Record<DataKey, string>>>({})
   const [loading, setLoading] = useState(true)
   const [setupError, setSetupError] = useState<string | null>(null)
+  const [scoreMode, setScoreMode] = useState<ScoreMode>('silhouette')
+  const [selectedCluster, setSelectedCluster] = useState<number | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -93,9 +124,8 @@ export default function ModelLaboratory() {
         const caps = await aeroscopeApi.capabilities(controller.signal)
         if (controller.signal.aborted) return
         setCapabilities(caps)
-        // Never query protected scientific endpoints when Render reports no public access.
+        // Research-only endpoints are deliberately disabled in the public deployment.
         if (!caps.research_data_loaded || !caps.research_results_available) return
-
         const settled = await Promise.allSettled([
           aeroscopeApi.modelMetrics(model, controller.signal),
           aeroscopeApi.modelProfiles(model, controller.signal),
@@ -111,241 +141,215 @@ export default function ModelLaboratory() {
           robustness: settled[3].status === 'fulfilled' ? settled[3].value : null,
           pca: settled[4].status === 'fulfilled' ? settled[4].value : null,
         })
-        const nextErrors: Partial<Record<DataKey, string>> = {}
-        settled.forEach((entry, index) => {
-          if (entry.status === 'rejected') nextErrors[DATA_KEYS[index]] = getError(entry.reason)
-        })
-        setErrors(nextErrors)
+        const failed: Partial<Record<DataKey, string>> = {}
+        settled.forEach((entry, i) => { if (entry.status === 'rejected') failed[DATA_KEYS[i]] = errorText(entry.reason) })
+        setErrors(failed)
       } catch (error: unknown) {
-        if (!controller.signal.aborted) setSetupError(getError(error))
+        if (!controller.signal.aborted) setSetupError(errorText(error))
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
     }
     void load()
     return () => controller.abort()
-  }, [model, retry])
+  }, [model, attempt])
 
   const allowed = Boolean(capabilities?.research_data_loaded && capabilities?.research_results_available)
+  const info = MODEL_INFO[model]
   const selectedRow = useMemo(() => data.metrics?.evaluation.find(row => row.k === data.metrics?.selected_k), [data.metrics])
-  const evaluationRows = data.metrics?.evaluation ?? []
+  const evalRows = useMemo(() => [...(data.metrics?.evaluation ?? [])].sort((a, b) => a.k - b.k), [data.metrics])
   const profiles = data.profiles?.profiles ?? []
   const pcaPoints = data.pca?.centroids ?? []
-  const colourById = new Map(profiles.map(p => [p.cluster_id, profileColor(p)]))
-  const modelInfo = MODEL_INFO[model]
+  const clusterColors = new Map(profiles.map(profile => [profile.cluster_id, profileColor(profile)]))
+  const selectedProfile = profiles.find(profile => profile.cluster_id === selectedCluster) ?? profiles[0]
+  const scoreText = scoreMode === 'silhouette' ? 'Silhouette coefficient' : 'Davies–Bouldin index'
+  const scoreColour = scoreMode === 'silhouette' ? '#14afa5' : '#f29355'
+  const k = data.metrics?.selected_k ?? info.configuredK
 
-  return (
-    <div className="min-h-screen bg-[#f3f6f7] text-[#12313a]">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4 lg:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <span aria-hidden="true" className="grid size-10 place-items-center rounded-xl bg-[#113e48] text-xl text-white">◎</span>
-            <span><strong className="block text-lg tracking-tight">AeroScope <span className="text-[#1f8979]">India</span></strong><span className="block text-[10px] tracking-[0.19em] text-slate-500">SATELLITE RESEARCH PLATFORM</span></span>
-          </Link>
-          <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Research navigation">
-            <Link to="/explore" className="rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">India Atlas</Link>
-            <Link to="/compare" className="rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">Compare States</Link>
-            <Link to="/hotspots" className="rounded-full border border-teal-200 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50">Hotspots</Link>
-            <Link to="/" className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-4 py-2 font-semibold hover:bg-slate-50"><ArrowLeft size={15}/> Home</Link>
-          </nav>
+  const status = loading ? 'Checking research API…'
+    : setupError ? 'API unavailable'
+      : allowed ? 'Research output accessible' : 'Research output restricted'
+  const unavailableDetail = setupError
+    ? `Unable to reach the analytics service: ${setupError}`
+    : !capabilities?.research_data_loaded
+      ? 'This deployment does not include restricted research outputs. Connect the local approved backend to view results.'
+      : !capabilities?.research_results_available
+        ? 'Publication of detailed MOSDAC-derived results is restricted on this deployment.'
+        : 'No saved result was returned for this panel.'
+
+  return <div className="al-lab">
+    <div className="al-lab-pagehead">
+      <div className="al-lab-heading">
+        <div className="al-lab-eyebrow"><span className="al-lab-pulse"/> MODEL INTELLIGENCE / UNSUPERVISED LEARNING</div>
+        <h1>Model <em>Laboratory.</em></h1>
+        <p>Where satellite observations become patterns. Explore K-Means experiments, validation and interpretable aerosol clusters.</p>
+      </div>
+      <div className="al-lab-headright">
+        <div className="al-lab-switch" role="group" aria-label="Select research model">
+          {(['model_a','model_b'] as const).map(option => <button key={option} type="button"
+            aria-pressed={model === option} className={model === option ? 'is-active' : ''}
+            onClick={() => { setModel(option); setSelectedCluster(null) }}>
+            <span className="al-lab-button-dot"/> Model {option === 'model_a' ? 'A' : 'B'}
+          </button>)}
         </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-5 pb-16 pt-10 lg:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.17em] text-teal-700">Research workspace · Phase 13</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Model Laboratory</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Examine the saved K-Means evaluation, interpreted clusters, PCA summaries, algorithm comparisons and robustness checks behind AeroScope India.</p>
-          </div>
-          <button type="button" disabled={loading} onClick={() => setRetry(current => current + 1)} className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-white px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:opacity-50"><RefreshCw size={15}/> Refresh results</button>
-        </div>
-
-        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-label="Select clustering model">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Select research model</p>
-              <h2 className="mt-1 text-lg font-semibold">{modelInfo.name}</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{modelInfo.description} Features: {modelInfo.features}.</p>
-            </div>
-            <div className="flex gap-2" role="group" aria-label="Clustering model">
-              {(['model_a', 'model_b'] as const).map(option => (
-                <button type="button" key={option} aria-pressed={model === option} onClick={() => setModel(option)} className={`rounded-full px-5 py-2.5 text-sm font-semibold ${model === option ? 'bg-[#12424a] text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                  Model {option === 'model_a' ? 'A' : 'B'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {loading && <div role="status" className="mt-6 rounded-xl bg-white p-5 text-sm text-slate-600">Checking the Flask backend and saved analysis…</div>}
-        {setupError && <div role="alert" className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm leading-6 text-rose-900">Cannot reach the Flask analytics service: {setupError}. Check the API base <code className="break-all">{API_BASE}</code> and CORS configuration.</div>}
-        {!loading && !setupError && !allowed && (
-          <div role="status" className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950">
-            <ShieldAlert className="mt-0.5 shrink-0" size={22}/>
-            <div>
-              <h2 className="font-semibold">Scientific results are not available on this deployment</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6">{capabilities?.research_data_loaded
-                ? 'This backend has the research files, but public access is disabled pending the applicable MOSDAC redistribution review.'
-                : 'The public backend does not have the research analysis files installed. The page will not generate placeholder metrics.'}</p>
-              <p className="mt-2 text-sm leading-6">The Model Laboratory can be explored locally using your approved, installed research artifacts. Model definitions remain visible here.</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && allowed && <>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Selected cluster count" value={data.metrics ? `K = ${data.metrics.selected_k}` : 'N/A'} footnote="Selected for research interpretation"/>
-            <Metric label="Silhouette at selected K" value={format(selectedRow?.silhouette, 4)} footnote="Higher generally indicates separation"/>
-            <Metric label="Davies–Bouldin at selected K" value={format(selectedRow?.davies_bouldin, 4)} footnote="Lower generally indicates separation"/>
-            <Metric label="PCA variance explained" value={data.pca ? percentage(data.pca.total_explained_variance * 100, 1) : 'N/A'} footnote="First two principal components"/>
-          </div>
-
-          <div className="mt-6 grid gap-5 xl:grid-cols-2">
-            <Panel title="K-Means evaluation · K = 2–8" description="Silhouette score from the 3,000-point sampling procedure in the research notebook. Higher is generally better.">
-              {data.metrics ? <>
-                <div className="h-64 w-full" role="img" aria-label="Silhouette score by K with selected K marked">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={evaluationRows} margin={{ top: 12, right: 18, left: 0, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
-                      <XAxis dataKey="k" tick={{fontSize:12}}/>
-                      <YAxis tick={{fontSize:12}} domain={['auto', 'auto']}/>
-                      <Tooltip/>
-                      <ReferenceLine x={data.metrics.selected_k} stroke="#e09a31" strokeDasharray="5 4" label={{value:'Selected K', position:'insideTopRight', fontSize:11}}/>
-                      <Line name="Silhouette" type="monotone" dataKey="silhouette" stroke="#138a7d" strokeWidth={3} dot={{r:4}} connectNulls={false}/>
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">Highest Silhouette was at K = {data.metrics.best_silhouette_k}; the selected K also reflects interpretability and application needs.</p>
-              </> : <Unavailable message={errors.metrics}/>}
-            </Panel>
-
-            <Panel title="Davies–Bouldin index" description="Lower values generally indicate more separated, compact groups; compare only within a model's feature space.">
-              {data.metrics ? <div className="h-64 w-full" role="img" aria-label="Davies Bouldin index by cluster count">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={evaluationRows} margin={{ top: 12, right: 18, left: 0, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
-                    <XAxis dataKey="k" tick={{fontSize:12}}/>
-                    <YAxis tick={{fontSize:12}} domain={['auto', 'auto']}/>
-                    <Tooltip/>
-                    <ReferenceLine x={data.metrics.selected_k} stroke="#e09a31" strokeDasharray="5 4"/>
-                    <Line name="Davies–Bouldin" type="monotone" dataKey="davies_bouldin" stroke="#2563a4" strokeWidth={3} dot={{r:4}} connectNulls={false}/>
-                  </LineChart>
-                </ResponsiveContainer>
-              </div> : <Unavailable message={errors.metrics}/>}
-            </Panel>
-
-            <Panel title="Within-cluster sum of squares" description="WCSS decreases as K rises. Do not compare WCSS magnitudes between Models A and B because the feature spaces differ.">
-              {data.metrics ? <div className="h-64 w-full" role="img" aria-label="Within-cluster sum of squares by cluster count">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={evaluationRows} margin={{ top: 12, right: 22, left: 4, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
-                    <XAxis dataKey="k" tick={{fontSize:12}}/>
-                    <YAxis width={66} tick={{fontSize:11}} tickFormatter={v => Number(v).toLocaleString('en-IN', {notation: 'compact'})}/>
-                    <Tooltip/>
-                    <ReferenceLine x={data.metrics.selected_k} stroke="#e09a31" strokeDasharray="5 4"/>
-                    <Line name="WCSS" type="monotone" dataKey="wcss" stroke="#8058a5" strokeWidth={3} dot={{r:4}} connectNulls={false}/>
-                  </LineChart>
-                </ResponsiveContainer>
-              </div> : <Unavailable message={errors.metrics}/>}
-            </Panel>
-
-            <Panel title="Cluster size distribution" description="Percentage of model-eligible satellite grid cells assigned to each final cluster.">
-              {data.profiles ? <div className="h-64 w-full" role="img" aria-label="Percentage of eligible cells by final cluster ID">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={profiles} margin={{ top: 12, right: 12, bottom: 10, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0"/>
-                    <XAxis dataKey="cluster_id" tick={{fontSize:12}}/>
-                    <YAxis tick={{fontSize:12}} unit="%"/>
-                    <Tooltip/>
-                    <Bar dataKey="percentage" name="Share of cells (%)" radius={[5,5,0,0]}>
-                      {profiles.map(p => <Cell key={p.cluster_id} fill={profileColor(p)}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div> : <Unavailable message={errors.profiles}/>}
-            </Panel>
-          </div>
-
-          <div className="mt-5 grid gap-5 xl:grid-cols-2">
-            <Panel title="Final cluster profiles" description="Derived descriptors of the model's classified cells. The original satellite data is not included in this page.">
-              {data.profiles ? <div className="space-y-3">
-                {profiles.map(profile => <article key={profile.cluster_id} className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold"><span className="size-3 rounded-full" style={{backgroundColor:profileColor(profile)}}/> {profile.cluster_name}</h3>
-                    <span className="text-xs font-medium text-slate-500">{format(profile.cells, 0)} cells · {percentage(profile.percentage)}</span>
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-600">{profile.description}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-                    <div className="rounded-lg bg-slate-50 p-2"><p className="text-slate-500">Mean AOD</p><strong className="mt-1 block">{format(profile.mean_aod)}</strong></div>
-                    <div className="rounded-lg bg-slate-50 p-2"><p className="text-slate-500">AOD variability</p><strong className="mt-1 block">{format(profile.std_aod)}</strong></div>
-                    <div className="rounded-lg bg-slate-50 p-2"><p className="text-slate-500">High-AOD frequency</p><strong className="mt-1 block">{percentage(profile.high_aod_percentage)}</strong></div>
-                  </div>
-                </article>)}
-                <p className="text-xs leading-5 text-slate-500">Cluster IDs are model-specific. The labels describe satellite AOD characteristics, not directly measured ground-level PM2.5.</p>
-              </div> : <Unavailable message={errors.profiles}/>}
-            </Panel>
-
-            <Panel title="PCA · cluster centroid projection" description="Only the mean PC1/PC2 position of each cluster is plotted. This is not a scatterplot of individual locations.">
-              {data.pca ? <>
-                <div className="h-72 w-full" role="img" aria-label="PCA scatter of final cluster centroids, not individual observations">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{top:16,right:25,bottom:12,left:4}}>
-                      <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3"/>
-                      <XAxis type="number" dataKey="PC1" name="PC1" tick={{fontSize:11}} domain={['auto','auto']} label={{value:'PC1',position:'insideBottom',offset:-6,fontSize:11}}/>
-                      <YAxis type="number" dataKey="PC2" name="PC2" tick={{fontSize:11}} domain={['auto','auto']} label={{value:'PC2',angle:-90,position:'insideLeft',fontSize:11}}/>
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }}/>
-                      <Scatter name="Cluster centroids" data={pcaPoints} fill="#168375">
-                        {pcaPoints.map(point => <Cell key={point.cluster_id} fill={colourById.get(point.cluster_id) ?? '#168375'}/>)}
-                        <LabelList dataKey="cluster_id" position="top"/>
-                      </Scatter>
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">Explained variance: PC1 {percentage((data.pca.explained_variance_ratio[0] ?? 0)*100)} · PC2 {percentage((data.pca.explained_variance_ratio[1] ?? 0)*100)}. Labels are cluster IDs.</p>
-                <div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="py-2 pr-3">Cluster</th><th className="py-2 pr-3">PC1</th><th className="py-2 pr-3">PC2</th><th className="py-2">Cells</th></tr></thead><tbody>{pcaPoints.map(point => <tr className="border-b last:border-0" key={point.cluster_id}><td className="py-2 pr-3">{point.cluster_id}</td><td className="py-2 pr-3">{format(point.PC1)}</td><td className="py-2 pr-3">{format(point.PC2)}</td><td className="py-2">{format(point.cells, 0)}</td></tr>)}</tbody></table></div>
-              </> : <Unavailable message={errors.pca}/>}
-            </Panel>
-          </div>
-
-          <div className="mt-5 grid gap-5 xl:grid-cols-2">
-            <Panel title="Alternative clustering algorithms" description="Saved K-Means, GMM and Manhattan K-Medians comparisons for the selected model.">
-              {data.comparisons ? <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-xs">
-                  <thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-3 pr-4">Algorithm</th><th className="py-3 pr-4">Silhouette (Eucl.)</th><th className="py-3 pr-4">Silhouette (Manh.)</th><th className="py-3 pr-4">DB</th><th className="py-3">ARI vs K-Means</th></tr></thead>
-                  <tbody>{data.comparisons.algorithms.map((row,index) => <tr key={`${row.algorithm}-${index}`} className="border-b border-slate-100 last:border-0"><td className="py-3 pr-4 font-semibold">{row.algorithm.replaceAll('_',' ')}</td><td className="py-3 pr-4">{format(row.silhouette_euclidean,4)}</td><td className="py-3 pr-4">{format(row.silhouette_manhattan,4)}</td><td className="py-3 pr-4">{format(row.davies_bouldin,4)}</td><td className="py-3">{format(row.ari_vs_kmeans,4)}</td></tr>)}</tbody>
-                </table>
-                <p className="mt-3 text-xs leading-5 text-slate-500">ARI and AMI measure assignment agreement relative to the K-Means solution. They do not measure prediction accuracy.</p>
-              </div> : <Unavailable message={errors.comparisons}/>}
-            </Panel>
-            <Panel title="Clustering robustness" description="Adjusted Rand Index (ARI) under repeat fitting, feature removal and subsampling.">
-              {data.robustness ? <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <Metric label="Seed mean ARI" value={format(data.robustness.summary.seed_mean_ari,4)}/>
-                  <Metric label="Seed min ARI" value={format(data.robustness.summary.seed_min_ari,4)}/>
-                  <Metric label="Feature removal ARI" value={format(data.robustness.summary.feature_removal_ari,4)}/>
-                  <Metric label="Subsample mean ARI" value={format(data.robustness.summary.subsample_mean_ari,4)}/>
-                  <Metric label="Subsample min ARI" value={format(data.robustness.summary.subsample_min_ari,4)}/>
-                </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">{data.robustness.notes}</p>
-              </> : <Unavailable message={errors.robustness}/>}
-            </Panel>
-          </div>
-        </>}
-
-        <section className="mt-6 rounded-2xl border border-teal-200 bg-teal-50 p-5 text-sm leading-6 text-teal-950">
-          <h2 className="flex items-center gap-2 font-semibold"><BookOpen size={17}/> How to interpret this laboratory</h2>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <p className="flex items-start gap-2"><BarChart3 className="mt-1 shrink-0" size={17}/> Clustering metrics evaluate internal structure, not environmental truth or causal sources.</p>
-            <p className="flex items-start gap-2"><FlaskConical className="mt-1 shrink-0" size={17}/> Different feature spaces mean Model A and B metric values are not always directly comparable.</p>
-            <p className="flex items-start gap-2"><Info className="mt-1 shrink-0" size={17}/> Satellite AOD is not real-time AQI or a direct measurement of surface PM2.5.</p>
-          </div>
-        </section>
-        <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500">
-          <p className="flex items-center gap-2"><Database size={14}/> Historical INSAT-3D research · 23 Aug 2022 to 5 Jun 2024 · MOSDAC/SAC/ISRO attribution</p>
-          <a className="inline-flex items-center gap-1 text-teal-800 underline underline-offset-4" href={`${API_BASE}/openapi.json`} target="_blank" rel="noreferrer"><Activity size={14}/> API specification</a>
-        </footer>
-      </main>
+        <button className="al-lab-refresh" type="button" disabled={loading} onClick={() => setAttempt(v => v + 1)} title="Refresh verified results"><RefreshCw size={16}/><span>Refresh</span></button>
+      </div>
     </div>
-  )
+
+    <div className="al-lab-model-strip">
+      <div className="al-lab-model-symbol"><FlaskConical size={24}/></div>
+      <div className="al-lab-model-details"><span>{info.tag} · SELECTED RESEARCH EXPERIMENT</span><strong>{info.title}</strong><p>{info.intro}</p></div>
+      <div className="al-lab-model-feature"><SlidersHorizontal size={15}/><span>{info.feature}</span></div>
+    </div>
+
+    <div className="al-lab-stat-grid">
+      <StatCard icon={<Layers3 size={20}/>} eyebrow="SELECTED CLUSTER COUNT" value={`K = ${k}`} note={data.metrics ? 'Verified selected configuration' : 'Configured research model'} tone="teal"/>
+      <StatCard icon={<Activity size={20}/>} eyebrow="SILHOUETTE SCORE" value={format(selectedRow?.silhouette, 4)} note="Higher suggests better separation" tone="violet"/>
+      <StatCard icon={<BarChart3 size={20}/>} eyebrow="DAVIES–BOULDIN" value={format(selectedRow?.davies_bouldin, 4)} note="Lower generally indicates better clustering" tone="amber"/>
+      <StatCard icon={<Sparkles size={20}/>} eyebrow="PCA EXPLAINED VARIANCE" value={data.pca ? percent(data.pca.total_explained_variance * 100) : '—'} note="First two principal components" tone="blue"/>
+    </div>
+
+    <div role="status" className={`al-lab-status ${allowed ? 'is-available' : ''} ${setupError ? 'is-error' : ''}`}>
+      <div className="al-lab-status-icon">{allowed ? <Activity size={17}/> : setupError ? <CircleAlert size={17}/> : <LockKeyhole size={17}/>}</div>
+      <div><strong>{status}</strong><span>{allowed ? 'Panels below use only precomputed results returned by the existing Flask API.' : unavailableDetail}</span></div>
+      <span className="al-lab-status-pill">HISTORICAL · 2022–2024</span>
+    </div>
+
+    <div className="al-lab-two-cols al-lab-primary-row">
+      <LabCard index="01 / CLUSTER ANATOMY" title="Inside the clusters" description="Relative share of model-eligible satellite grid cells." className="al-lab-composition">
+        <div className="al-lab-composition-body">
+          <Donut profiles={profiles}/>
+          <div className="al-lab-composition-side">
+            {profiles.length > 0 ? <div className="al-lab-profile-picks">
+              {profiles.map(profile => <button type="button" key={profile.cluster_id}
+                aria-pressed={selectedProfile?.cluster_id === profile.cluster_id}
+                onClick={() => setSelectedCluster(profile.cluster_id)} className={`al-lab-cluster-pick ${selectedProfile?.cluster_id === profile.cluster_id ? 'is-selected' : ''}`}>
+                <span className="al-lab-cluster-dot" style={{ backgroundColor: profileColor(profile) }}/>
+                <span className="al-lab-cluster-name">{profile.cluster_name}</span>
+                <strong>{percent(profile.percentage)}</strong>
+              </button>)}
+            </div> : <div className="al-lab-muted-legend">
+              <span><i className="al-lab-key al-lab-key-teal"/> Cluster profiles</span><span><i className="al-lab-key al-lab-key-amber"/> AOD variability</span><span><i className="al-lab-key al-lab-key-coral"/> Regional patterns</span>
+              <p>{loading ? 'Loading verified profiles…' : 'Cluster proportions appear when research results are accessible.'}</p>
+            </div>}
+          </div>
+        </div>
+        <div className="al-lab-comp-footer">
+          {selectedProfile ? <><strong>{selectedProfile.cluster_name}</strong><span>Mean AOD {format(selectedProfile.mean_aod)} · {format(selectedProfile.cells, 0)} grid cells</span></> : <><strong>Model-dependent cluster composition</strong><span>No simulated proportions or assignments</span></>}
+        </div>
+      </LabCard>
+
+      <LabCard index="02 / MODEL SELECTION" title="Clustering performance" description="Explore separation and compactness across evaluated K values."
+        action={<div className="al-lab-chart-tabs" role="group" aria-label="Select clustering quality metric">
+          <button type="button" aria-pressed={scoreMode === 'silhouette'} className={scoreMode === 'silhouette' ? 'is-active' : ''} onClick={() => setScoreMode('silhouette')}>Silhouette</button>
+          <button type="button" aria-pressed={scoreMode === 'davies_bouldin'} className={scoreMode === 'davies_bouldin' ? 'is-active' : ''} onClick={() => setScoreMode('davies_bouldin')}>DBI</button>
+        </div>}>
+        {data.metrics ? <div className="al-lab-chart-wrap" role="img" aria-label={`${scoreText} by cluster count, from verified research outputs`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={evalRows} margin={{ top: 14, right: 24, left: -9, bottom: 7 }}>
+              <CartesianGrid strokeDasharray="4 5" stroke="#e8efec" vertical={false}/>
+              <XAxis dataKey="k" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#819891' }} tickFormatter={value => `K${value}`}/>
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#819891' }} width={45}/>
+              <Tooltip contentStyle={tooltipStyle}/>
+              <ReferenceLine x={data.metrics.selected_k} stroke="#c4b3e8" strokeDasharray="4 4"/>
+              <Line name={scoreText} type="monotone" dataKey={scoreMode} connectNulls={false} stroke={scoreColour} strokeWidth={3.5}
+                dot={{ r: 4, fill: '#fff', strokeWidth: 2.5 }} activeDot={{ r: 6 }}/>
+            </LineChart>
+          </ResponsiveContainer>
+        </div> : <EmptyChart title={loading ? 'Preparing evaluation curves' : 'Performance metrics are restricted'} description={errors.metrics ?? unavailableDetail}/>}
+        <div className="al-lab-chart-caption"><span className="al-lab-colorbar" style={{ background: scoreColour }}/>{scoreText}<span className="al-lab-caption-right">{data.metrics ? `Best Silhouette: K = ${data.metrics.best_silhouette_k}` : 'No unverified scores displayed'}</span></div>
+      </LabCard>
+    </div>
+
+    <div className="al-lab-two-cols">
+      <LabCard index="03 / OPTIMIZATION" title="Elbow · within-cluster error" description="WCSS across K. A decreasing curve alone does not prove an optimal solution.">
+        {data.metrics ? <div className="al-lab-chart-wrap" role="img" aria-label="Within-cluster sum of squares by K">
+          <ResponsiveContainer width="100%" height="100%"><LineChart data={evalRows} margin={{ top: 14, right: 24, left: -9, bottom: 7 }}>
+            <CartesianGrid strokeDasharray="4 5" stroke="#e8efec" vertical={false}/>
+            <XAxis dataKey="k" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#819891' }} tickFormatter={value => `K${value}`}/>
+            <YAxis tickLine={false} axisLine={false} width={54} tick={{ fontSize: 10, fill: '#819891' }} tickFormatter={v => Number(v).toLocaleString('en-IN', { notation: 'compact' })}/>
+            <Tooltip contentStyle={tooltipStyle}/><ReferenceLine x={data.metrics.selected_k} stroke="#d7b76d" strokeDasharray="4 4"/>
+            <Line type="monotone" dataKey="wcss" name="Within-cluster sum of squares" stroke="#ec9b65" strokeWidth={3.3} dot={{ r: 4, fill: '#fff', strokeWidth: 2 }}/>
+          </LineChart></ResponsiveContainer>
+        </div> : <EmptyChart title={loading ? 'Loading optimization results' : 'WCSS results unavailable'} description={errors.metrics ?? unavailableDetail}/>}
+        <div className="al-lab-card-footnote"><Info size={14}/> WCSS magnitudes should not be compared directly across different model feature spaces.</div>
+      </LabCard>
+
+      <LabCard index="04 / DIMENSIONALITY REDUCTION" title="PCA · cluster projection" description="PC1 and PC2 positions of cluster centroids (not individual geographic locations).">
+        {data.pca && pcaPoints.length > 0 ? <div className="al-lab-chart-wrap" role="img" aria-label="PCA projection of saved cluster centroids">
+          <ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{ top: 15, right: 20, bottom: 16, left: 2 }}>
+            <CartesianGrid strokeDasharray="4 5" stroke="#e8efec"/>
+            <XAxis type="number" dataKey="PC1" name="PC1" tickLine={false} axisLine={false} domain={['auto','auto']} tick={{ fontSize: 11, fill: '#819891' }} label={{ value: 'PC1', position: 'insideBottom', offset: -12, fontSize: 11 }}/>
+            <YAxis type="number" dataKey="PC2" name="PC2" tickLine={false} axisLine={false} domain={['auto','auto']} tick={{ fontSize: 11, fill: '#819891' }} label={{ value: 'PC2', angle: -90, position: 'insideLeft', fontSize: 11 }}/>
+            <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: '3 3' }}/>
+            <Scatter data={pcaPoints} name="Cluster centroids" fill="#2bc4ad">
+              {pcaPoints.map(point => <Cell key={point.cluster_id} fill={clusterColors.get(point.cluster_id) ?? '#2bc4ad'}/>)}
+              <LabelList dataKey="cluster_id" position="top"/>
+            </Scatter>
+          </ScatterChart></ResponsiveContainer>
+        </div> : <EmptyChart title={loading ? 'Loading PCA projection' : 'PCA centroids unavailable'} description={errors.pca ?? unavailableDetail}/>}
+        <div className="al-lab-chart-caption"><span>Explained variance</span><strong>{data.pca ? percent(data.pca.total_explained_variance * 100) : '—'}</strong><span className="al-lab-caption-right">Two principal components</span></div>
+      </LabCard>
+    </div>
+
+    <div className="al-lab-two-cols al-lab-detail-row">
+      <LabCard index="05 / INTERPRETATION" title="Cluster profile library" description="Click a cluster in the composition panel to explore its original-unit features."
+        action={<Link className="al-lab-link" to="/cluster-insights?tab=profiles">All insights <ArrowUpRight size={15}/></Link>}>
+        {selectedProfile ? <div className="al-lab-profile-focus">
+          <div className="al-lab-profile-name"><span className="al-lab-large-dot" style={{ backgroundColor: profileColor(selectedProfile) }}/><div><strong>{selectedProfile.cluster_name}</strong><p>{selectedProfile.description}</p></div></div>
+          <div className="al-lab-feature-grid">
+            <div><span>Mean AOD</span><strong>{format(selectedProfile.mean_aod)}</strong></div>
+            <div><span>AOD variability</span><strong>{format(selectedProfile.std_aod)}</strong></div>
+            <div><span>High-AOD frequency</span><strong>{percent(selectedProfile.high_aod_percentage)}</strong></div>
+            <div><span>Median valid days</span><strong>{format(selectedProfile.median_valid_days, 0)}</strong></div>
+          </div>
+          {model === 'model_b' && <div className="al-lab-season-row">
+            {([['Winter', selectedProfile.winter_mean], ['Pre-monsoon', selectedProfile.premonsoon_mean], ['Monsoon', selectedProfile.monsoon_mean], ['Post-monsoon', selectedProfile.postmonsoon_mean]] as const)
+              .map(([label, value]) => <div key={label}><span>{label}</span><strong>{format(value)}</strong></div>)}
+          </div>}
+        </div> : <EmptyChart title={loading ? 'Loading interpreted clusters' : 'Cluster profiles are unavailable'} description={errors.profiles ?? unavailableDetail}/>}
+        <div className="al-lab-card-footnote"><Info size={14}/> Cluster names summarize relative historical AOD characteristics, not surface PM2.5 exposure or health risk.</div>
+      </LabCard>
+
+      <LabCard index="06 / METHOD COMPARISON" title="Algorithm comparison" description="Saved clustering comparisons for the selected model, with distance-aware evaluation.">
+        {data.comparisons ? <div className="al-lab-table-wrap"><table className="al-lab-table">
+          <thead><tr><th>Algorithm</th><th>Silh. L2</th><th>Silh. L1</th><th>DBI</th><th>ARI vs K-Means</th></tr></thead>
+          <tbody>{data.comparisons.algorithms.map((row, i) => <tr key={`${row.algorithm}-${i}`}>
+            <td><span className="al-lab-method-dot"/>{row.algorithm.replaceAll('_', ' ')}</td>
+            <td>{format(row.silhouette_euclidean, 3)}</td><td>{format(row.silhouette_manhattan, 3)}</td><td>{format(row.davies_bouldin, 3)}</td><td>{format(row.ari_vs_kmeans, 3)}</td>
+          </tr>)}</tbody>
+        </table></div> : <EmptyChart title={loading ? 'Loading method comparisons' : 'Algorithm comparisons restricted'} description={errors.comparisons ?? unavailableDetail}/>}
+        <div className="al-lab-card-footnote"><Info size={14}/> ARI compares assignments, not predictive accuracy. L1 and L2 are evaluated separately.</div>
+      </LabCard>
+    </div>
+
+    <div className="al-lab-two-cols al-lab-bottom-row">
+      <LabCard index="07 / STABILITY CHECKS" title="Experiment robustness" description="Stability of assignments across seeds, feature removal and subsampling.">
+        <div className="al-lab-robust-grid">
+          {([
+            ['Seed mean ARI', data.robustness?.summary.seed_mean_ari],
+            ['Seed minimum ARI', data.robustness?.summary.seed_min_ari],
+            ['Feature removal ARI', data.robustness?.summary.feature_removal_ari],
+            ['Subsample mean ARI', data.robustness?.summary.subsample_mean_ari],
+          ] as const).map(([label, value]) => <div key={label}><span>{label}</span><strong>{format(value, 4)}</strong></div>)}
+        </div>
+        <div className="al-lab-card-footnote"><Info size={14}/>{data.robustness?.notes ?? errors.robustness ?? 'Computed robustness values appear only when the research API makes them available.'}</div>
+      </LabCard>
+      <LabCard index="08 / RESEARCH CONTEXT" title="Read the results responsibly" description="Validation is evidence about statistical structure, not direct environmental truth.">
+        <div className="al-lab-explainers">
+          <div><span className="al-lab-explainer-icon"><BarChart3 size={17}/></span><p>Silhouette and Davies–Bouldin summarize clustering structure within the chosen feature space.</p></div>
+          <div><span className="al-lab-explainer-icon coral"><Layers3 size={17}/></span><p>Model A and B use different feature sets, so raw WCSS values should not be compared.</p></div>
+          <div><span className="al-lab-explainer-icon lilac"><ShieldAlert size={17}/></span><p>INSAT-3D AOD is column-integrated historical aerosol information, not real-time AQI.</p></div>
+        </div>
+        <Link className="al-lab-methodology" to="/research">Review methodology and limitations <ArrowRight size={16}/></Link>
+      </LabCard>
+    </div>
+
+    <footer className="al-lab-footer">
+      <span><Database size={14}/> INSAT-3D · 23 Aug 2022–5 Jun 2024 · MOSDAC / SAC / ISRO</span>
+      <span>Historical AOD · no live pollution readings</span>
+      <a href={`${API_BASE}/openapi.json`} target="_blank" rel="noreferrer">API contract <ArrowUpRight size={14}/></a>
+      <Link to="/research"><BookOpen size={14}/> Research methodology</Link>
+    </footer>
+  </div>
 }

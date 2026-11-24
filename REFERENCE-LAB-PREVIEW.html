@@ -1,0 +1,302 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>AeroScope India · ML Laboratory reference preview</title>
+<style>/* AeroScope India / reference-inspired light dashboard.
+   Namespaced al-* so the existing research workspaces remain intact. */
+:root {
+  --al-paper:#f3f8f6; --al-white:#fff; --al-ink:#132b2b; --al-sub:#687f7d;
+  --al-mute:#93a7a4; --al-border:#e6efeb; --al-teal:#09a69c;
+}
+.al-app {min-height:100vh;background:linear-gradient(145deg,#b5cbc7 0%,#d7e6e1 55%,#bed5d2 100%);padding:18px;color:var(--al-ink);font-family:Inter,"Segoe UI",system-ui,sans-serif}
+.al-app *, .al-app *::before, .al-app *::after {box-sizing:border-box}
+.al-app a {text-decoration:none}
+.al-frame{max-width:1600px;margin:0 auto;min-height:calc(100vh - 36px);display:grid;grid-template-columns:72px minmax(0,1fr);background:var(--al-paper);border:1px solid #dce9e4;border-radius:38px;box-shadow:0 27px 80px #315a5240;overflow:hidden}
+.al-sidebar{position:relative;border-right:1px solid #e4efec;background:linear-gradient(180deg,#f6fbf9,#f9fdfb);display:flex;flex-direction:column;align-items:center;padding:27px 11px 20px;gap:50px;z-index:20}
+.al-sidebrand{width:42px;height:42px;display:grid;place-items:center;color:#073937;border-radius:15px;background:#e6f1ee;transition:transform .2s}
+.al-sidebrand:hover{transform:rotate(-12deg)}
+.al-sidenav{display:flex;flex-direction:column;gap:14px;align-items:center}
+.al-navicon{position:relative;display:grid;place-items:center;width:43px;height:43px;color:#526c69;border-radius:15px;transition:background .2s,color .2s,transform .2s}
+.al-navicon:hover,.al-navicon.is-active{background:#143e3c;color:#fff;transform:translateY(-1px)}
+.al-tooltip{position:absolute;left:calc(100% + 14px);top:50%;transform:translateY(-50%) translateX(-5px);white-space:nowrap;background:#143e3c;color:#fff;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:700;letter-spacing:.02em;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;box-shadow:0 5px 17px #1b423f38}
+.al-navicon:hover .al-tooltip,.al-navicon:focus-visible .al-tooltip{opacity:1;transform:translateY(-50%) translateX(0)}
+.al-sidebar-end{margin-top:auto;font-size:11px;font-weight:850;letter-spacing:.1em;border-radius:100%;width:34px;height:34px;display:grid;place-items:center;color:#73918c;border:1px solid #cfdfda}
+.al-maincolumn{min-width:0;display:flex;flex-direction:column}
+.al-topbar{min-height:88px;padding:20px clamp(22px,3vw,52px) 15px;display:flex;justify-content:space-between;align-items:center;gap:24px}
+.al-brand{display:flex;flex-direction:column;color:#153533;font-size:20px;font-weight:850;letter-spacing:-.06em;line-height:1}
+.al-brand>span span{color:#16aca2}
+.al-brand small{margin-top:8px;color:#8ca29e;font-size:8px;font-weight:750;letter-spacing:.22em}
+.al-header-right{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.al-era{display:inline-flex;align-items:center;gap:8px;color:#718a84;font-size:10px;font-weight:750;letter-spacing:.095em}
+.al-era-dot,.al-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3cccb7;box-shadow:0 0 0 4px #d2f4ea}
+.al-explorelink{display:flex;align-items:center;gap:9px;background:#153c39;color:#fff;padding:12px 17px;border-radius:999px;font-size:12px;font-weight:750;transition:transform .2s,background .2s}
+.al-explorelink:hover{background:#0c8f86;transform:translateY(-2px)}
+.al-menu{display:none;border:0;background:#e3eeea;color:#1e514b;border-radius:12px;padding:8px;cursor:pointer}
+.al-mobile-nav{display:none}
+.al-content{flex:1;min-width:0;padding:4px clamp(22px,3vw,52px) 35px}
+.al-overview{width:100%}
+.al-page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:36px;margin:12px 0 29px}
+.al-page-heading>div:first-child{max-width:630px}
+.al-page-eyebrow,.al-section-id{font-size:10px;font-weight:800;letter-spacing:.16em;color:#2d9991;display:flex;align-items:center;gap:10px}
+.al-page-heading h1{margin:11px 0 8px;font-size:clamp(34px,3.8vw,56px);line-height:1.04;font-weight:820;letter-spacing:-.065em;color:#101c1d}
+.al-page-heading h1 span{color:#229e97}
+.al-page-heading p{max-width:565px;margin:0;font-size:13px;line-height:1.6;color:#637a78}
+.al-headstats{display:flex;gap:clamp(20px,2.8vw,55px);align-items:flex-end;padding-bottom:4px}
+.al-headstats div{display:flex;flex-direction:column;gap:3px;white-space:nowrap}
+.al-headstats strong{font-weight:820;font-size:clamp(27px,3.1vw,43px);letter-spacing:-.06em;line-height:1;color:#0c1e20}
+.al-headstats span{font-size:11px;color:#819491}
+.al-dashboard-grid{display:grid;grid-template-columns:minmax(330px,.94fr) minmax(490px,1.21fr);grid-template-rows:minmax(360px,auto) minmax(266px,auto);gap:15px}
+.al-card{background:#fff;border:1px solid #e5eeea;border-radius:25px;box-shadow:0 7px 25px #658c7c0a,0 1px 3px #30534e10;min-width:0;overflow:hidden;padding:24px 26px;display:flex;flex-direction:column;position:relative}
+.al-card-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;position:relative;z-index:3}
+.al-card-heading h2{font-size:17px;letter-spacing:-.037em;color:#142322;font-weight:770;margin:6px 0 0}
+.al-card-heading .al-section-id{font-size:9px;letter-spacing:.13em;color:#9aaba7}
+.al-icon-action{width:35px;height:35px;border:1px solid #e5eeea;background:#f7faf9;color:#53736c;border-radius:50%;display:grid;place-items:center;transition:background .2s,color .2s,transform .2s}
+.al-icon-action:hover{background:#164640;color:#fff;transform:rotate(10deg)}
+.al-model-body{display:grid;grid-template-columns:minmax(145px,.87fr) 1.2fr;align-items:center;gap:20px;flex:1;padding-top:16px}
+.al-model-ring{position:relative;width:100%;max-width:196px;aspect-ratio:1/1;display:grid;place-items:center;margin-inline:auto}
+.al-model-ring svg{position:absolute;inset:0;width:100%;height:100%}
+.al-model-ring>div{text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.al-model-ring strong{font-size:clamp(34px,3vw,49px);font-weight:850;letter-spacing:-.08em;line-height:.95;color:#122525}
+.al-model-ring span{color:#82918e;font-size:11px;line-height:1.4}
+.al-model-list{min-width:0}
+.al-model-row{display:flex;align-items:center;gap:10px;padding:15px 0;border-bottom:1px dashed #dfe8e4}
+.al-model-dot{width:9px;height:9px;background:#1dc6ae;border-radius:50%;box-shadow:0 0 0 4px #ddf8ed;flex:none}
+.al-model-dot.coral{background:#fa986d;box-shadow:0 0 0 4px #fff1e8}
+.al-model-row>div{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.al-model-row strong{font-size:12px;font-weight:800;color:#253d39}
+.al-model-row small{font-size:10px;color:#91a4a0}
+.al-model-row b{font-size:12px;color:#1f3431;white-space:nowrap}
+.al-model-note{display:flex;align-items:center;gap:8px;color:#8aa39e;font-size:10px;margin-top:18px;line-height:1.5}
+.al-card-tail{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #edf2ef;padding-top:13px;margin-top:auto;font-size:10px;color:#90a29e}
+.al-card-tail a,.al-validation-footer a{display:inline-flex;align-items:center;gap:6px;color:#168f85;font-weight:800;font-size:11px;white-space:nowrap}
+.al-atlas-card{padding:0;min-height:366px}
+.al-atlas-head{padding:20px 22px 10px}
+.al-map-switch{display:flex;gap:3px;background:#eef4f1;border:1px solid #e1eae5;padding:4px;border-radius:999px}
+.al-map-switch button{cursor:pointer;border:0;background:transparent;border-radius:999px;padding:7px 12px;font-size:10px;color:#738d88;font-weight:800;transition:color .2s,background .2s}
+.al-map-switch button.is-active{background:#fff;color:#147e77;box-shadow:0 1px 6px #33534b15}
+.al-atlas-view{position:relative;flex:1;min-height:270px;overflow:hidden;background:radial-gradient(ellipse at 60% 50%,#f6faf7 0%,#edf5f1 73%,#e8f2ed 100%)}
+.al-atlas-view:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.34;background-image:radial-gradient(#89aaa3 .8px,transparent .8px);background-size:18px 18px;z-index:0}
+.al-map-visual{position:absolute;inset:0;z-index:1}
+.al-map-root{position:absolute;inset:0;width:100%;height:100%}
+.al-map-leaflet{width:100%;height:100%;min-height:230px}
+.al-map-leaflet.leaflet-container{background:transparent!important;font-family:inherit;cursor:grab}
+.al-map-leaflet .leaflet-interactive:focus{outline-color:#1bb7a8}
+.al-map-tooltip{border-radius:9px!important;border:1px solid #dce9e3!important;box-shadow:0 6px 22px #21463821!important;color:#174944!important;font-weight:750!important}
+.al-hotspot-halo{filter:blur(3px);pointer-events:none}
+.al-hotspot-core{filter:drop-shadow(0 0 4px #f8a17a)}
+.al-map-controls{z-index:500;position:absolute;left:19px;bottom:56px;display:flex;flex-direction:column;gap:5px}
+.al-map-controls button{width:31px;height:31px;background:#fff;color:#325b55;border:1px solid #dce7e2;border-radius:11px;box-shadow:0 3px 10px #224f4322;font-size:22px;line-height:1;cursor:pointer}
+.al-map-controls button:hover{background:#e4f5ed}
+.al-map-error{position:absolute;top:18px;left:18px;right:18px;z-index:600;background:#fffaf3;padding:11px 13px;border:1px solid #ffe7ba;border-radius:12px;font-size:11px;line-height:1.5;color:#826025}
+.al-satellite-wrap{position:absolute;z-index:480;top:-12px;right:19px;width:190px;height:149px;pointer-events:none;display:flex;flex-direction:column;align-items:center}
+.al-satellite-svg{width:100%;height:138px;overflow:visible;filter:drop-shadow(0 7px 7px #8aa7a13a)}
+.al-satellite-motion{animation:al-satfloat 6s ease-in-out infinite;transform-origin:50% 45%}
+.al-scan-pulse{animation:al-scan 3.6s ease-in-out infinite}
+.al-satellite-caption{margin-top:-10px;font-size:8px;letter-spacing:.06em;color:#789d93;background:#ffffffa8;border-radius:999px;padding:4px 8px}
+@keyframes al-satfloat{0%,100%{transform:translateY(0px) rotate(-2deg)}50%{transform:translateY(-10px) rotate(2deg)}}
+@keyframes al-scan{0%,100%{opacity:.25}50%{opacity:1}}
+.al-atlas-bottomline{position:absolute;left:62px;right:15px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:490;font-size:10px;font-weight:750;color:#476e65;pointer-events:none}
+.al-atlas-bottomline>div{background:#ffffffd9;border:1px solid #e0ebe5;border-radius:999px;padding:8px 11px;max-width:54%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px)}
+.al-atlas-bottomline a{display:inline-flex;align-items:center;gap:5px;background:#183e3b;color:#fff;padding:9px 12px;border-radius:999px;white-space:nowrap;pointer-events:auto}
+.al-map-key{display:inline-block;width:6px;height:6px;background:#25b7a3;border-radius:100%;margin-right:5px}
+.al-atlas-status{border-top:1px solid #e4eee9;padding:10px 17px 12px;display:flex;align-items:center;font-size:10px;color:#8a9e9a;min-height:36px}
+.al-status-dot{background:#e2a754;border-radius:100%;width:6px;height:6px;margin-right:8px;flex-shrink:0}
+.al-status-dot.live{background:#11ba9f}
+.al-pipeline-card,.al-validation-card{min-height:265px}
+.al-flowgraphic{flex:1;min-height:95px;display:flex;align-items:center;margin:3px -26px -4px;overflow:hidden}
+.al-flowgraphic svg{width:100%;height:108px}
+.al-pipeline-stats{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:auto}
+.al-pipeline-stats div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.al-pipeline-stats strong{font-size:clamp(16px,2vw,22px);font-weight:850;letter-spacing:-.05em;color:#18332f}
+.al-pipeline-stats span{font-size:10px;color:#8fa29e}
+.al-pipeline-stats>svg{color:#bacac5;flex-shrink:0}
+.al-validation-card{padding-bottom:14px}
+.al-validation-empty{flex:1;min-height:140px;display:flex;flex-direction:column;justify-content:center;gap:17px}
+.al-analysis-tags{display:flex;flex-wrap:wrap;gap:7px}
+.al-analysis-tags span{font-size:10px;font-weight:700;color:#577c74;padding:7px 10px;background:#f3f8f5;border-radius:999px}
+.al-validation-divider{display:flex;align-items:center;justify-content:center;gap:12px}
+.al-small-orbit{width:43px;height:43px;display:grid;place-items:center;border-radius:14px;color:#7a9191;background:#e9f2f0;flex-shrink:0}
+.al-small-orbit.teal{color:#0a988d;background:#ddf6eb}.al-small-orbit.peach{color:#db8b57;background:#fff0e2}
+.al-validation-line{width:24%;max-width:70px;border-top:2px dashed #cfe3db}
+.al-validation-empty p{font-size:10px;line-height:1.5;color:#8fa29b;margin:0;text-align:center}
+.al-chart-real{flex:1;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.al-chart-real svg{width:100%;height:125px}
+.al-chart-real p{font-size:10px;color:#8ba09a;text-align:center;margin:0}
+.al-empty-chart{font-size:12px;color:#94a5a1}
+.al-validation-footer{margin-top:auto;border-top:1px solid #eef3f0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:11px;font-size:10px;color:#9aaba5}
+.al-modules{margin-top:29px}
+.al-module-intro{display:flex;justify-content:space-between;align-items:flex-end;gap:15px;margin-bottom:14px}
+.al-module-intro h2{font-size:20px;font-weight:800;margin:5px 0 0;letter-spacing:-.04em}
+.al-module-intro p{font-size:11px;color:#849a95;margin:0 0 2px}
+.al-module-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.al-module-tile{display:flex;align-items:center;gap:12px;padding:14px;background:#fff;border:1px solid #e6eeea;border-radius:19px;min-width:0;box-shadow:0 3px 16px #59837409;transition:transform .2s,box-shadow .2s}
+.al-module-tile:hover{transform:translateY(-3px);box-shadow:0 12px 25px #3b756023}
+.al-module-icon{width:38px;height:38px;display:grid;place-items:center;background:#e5f7ed;color:#219e82;border-radius:14px;flex:none}
+.al-module-tile.purple .al-module-icon{background:#f1eaff;color:#9370c4}
+.al-module-tile.peach .al-module-icon{background:#fff1e7;color:#d98e60}
+.al-module-tile.blue .al-module-icon{background:#e6f4fc;color:#428ca9}
+.al-module-tile>span:nth-child(2){display:flex;flex-direction:column;min-width:0;gap:3px;flex:1}
+.al-module-tile strong{font-size:11px;font-weight:800;color:#203e38}
+.al-module-tile small{font-size:9px;color:#92a49d}
+.al-module-tile>svg{color:#93a9a1;flex-shrink:0}
+.al-footer{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-top:24px;margin-top:22px;border-top:1px solid #dae8e2;color:#8b9e98;font-size:10px;line-height:1.5}
+.al-footer p{margin:0;display:flex;align-items:center;gap:5px}
+.al-footer>div{display:flex;align-items:center;gap:5px}
+.al-footer p:last-child{flex-basis:100%}
+.al-retry{display:grid;place-items:center;background:#e6efeb;border:0;border-radius:7px;color:#467d74;padding:6px;cursor:pointer}
+/* Unmodified pages remain fully functional, but share the light rounded-card language. */
+.al-legacy{min-width:0}
+.al-legacy>div>header{display:none}
+.al-legacy>div{background:transparent!important}
+.al-legacy section.rounded-2xl,.al-legacy section.rounded-3xl,.al-legacy .rounded-2xl.border{border-radius:24px!important;box-shadow:0 4px 20px #678c7d0a;border-color:#e5ede9!important}
+.al-legacy main{padding-left:0!important;padding-right:0!important;max-width:100%!important}
+.al-insights-top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:18px 0 26px}
+.al-insights-top h1{font-size:clamp(30px,4vw,48px);font-weight:810;letter-spacing:-.06em;margin:8px 0 6px}
+.al-insights-top p{font-size:12px;color:#7b9390;margin:0}
+.al-insights-tabs{display:flex;background:#e6efeb;padding:5px;border-radius:999px;gap:4px}
+.al-insights-tabs button{font-size:11px;font-weight:800;color:#5d7973;border:0;border-radius:999px;background:transparent;padding:10px 14px;white-space:nowrap;cursor:pointer}
+.al-insights-tabs button.is-active{background:#fff;color:#138d83;box-shadow:0 2px 9px #2e604d1a}
+@media(max-width:1260px){.al-page-heading{align-items:flex-start}.al-headstats{gap:20px}.al-dashboard-grid{grid-template-columns:minmax(310px,.9fr) minmax(450px,1.1fr)}.al-content{padding-inline:25px}.al-topbar{padding-inline:25px}}
+@media(max-width:1040px){.al-page-heading{flex-direction:column;gap:20px}.al-dashboard-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}.al-model-body{grid-template-columns:1fr}.al-model-ring{width:125px}.al-headstats strong{font-size:30px}.al-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){.al-frame{display:block;border-radius:26px}.al-sidebar{display:none}.al-topbar{min-height:70px}.al-menu{display:grid;place-items:center}.al-mobile-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px 22px 16px;background:#f7fbf9;border-bottom:1px solid #e0ebe7}.al-mobile-nav a{padding:10px;background:#fff;color:#266a61;border-radius:11px;font-size:12px;text-align:center}.al-dashboard-grid{grid-template-columns:1fr;grid-template-rows:auto}.al-model-body{grid-template-columns:170px 1fr}.al-atlas-view{min-height:390px}.al-headstats{gap:35px}.al-content{padding-inline:22px}.al-topbar{padding-inline:22px}.al-insights-top{flex-direction:column;align-items:flex-start}}
+@media(max-width:600px){.al-app{padding:0;background:var(--al-paper)}.al-frame{border:none;border-radius:0;min-height:100vh;box-shadow:none}.al-era{display:none}.al-explorelink{font-size:10px;padding:10px 12px}.al-content{padding:8px 15px 24px}.al-topbar{padding:14px 15px}.al-page-heading{margin:9px 0 24px}.al-page-heading h1{font-size:37px}.al-page-heading p{font-size:12px}.al-headstats{width:100%;justify-content:space-between;gap:7px}.al-headstats strong{font-size:24px}.al-headstats span{font-size:9px}.al-card{padding:20px}.al-atlas-card{padding:0}.al-model-body{grid-template-columns:1fr 1fr;gap:8px}.al-model-ring{width:135px}.al-model-list{padding-left:0}.al-model-row{gap:7px}.al-model-row b{font-size:10px}.al-atlas-view{min-height:320px}.al-satellite-wrap{width:135px;height:105px;top:-9px;right:2px}.al-satellite-svg{height:105px}.al-satellite-caption{font-size:7px;margin-top:-12px}.al-atlas-bottomline{right:8px;left:10px;bottom:8px}.al-atlas-bottomline a{padding:8px;font-size:9px}.al-map-controls{bottom:50px;left:12px}.al-card-tail{align-items:flex-start;flex-direction:column}.al-module-grid{grid-template-columns:1fr}.al-module-intro{align-items:flex-start;flex-direction:column}.al-pipeline-stats strong{font-size:17px}}
+@media(prefers-reduced-motion:reduce){.al-app *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}.al-satellite-motion,.al-scan-pulse{animation:none!important}}
+
+/* ML Laboratory · AeroScope reference-inspired light dashboard.
+   All selectors are namespaced al-lab-* to protect the Overview and other pages. */
+.al-lab{color:#173731;font-family:Inter,"Segoe UI",system-ui,sans-serif;min-width:0;padding-bottom:25px}
+.al-lab *,.al-lab *::before,.al-lab *::after{box-sizing:border-box}
+.al-lab button,.al-lab a{font:inherit}
+.al-lab button{cursor:pointer}
+.al-lab a{text-decoration:none}
+.al-lab-pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:14px 0 27px}
+.al-lab-heading{min-width:0;max-width:790px}
+.al-lab-eyebrow{font-weight:850;font-size:10px;letter-spacing:.18em;color:#129d91;display:flex;align-items:center;gap:9px}
+.al-lab-pulse{width:7px;height:7px;border-radius:50%;background:#26c7a6;box-shadow:0 0 0 5px #27cda21a;flex:none}
+.al-lab-pagehead h1{font-size:clamp(34px,3.7vw,57px);line-height:1.04;letter-spacing:-.065em;font-weight:880;margin:13px 0 10px;color:#142c29}
+.al-lab-pagehead h1 em{font-style:normal;color:#23b3a3}
+.al-lab-pagehead p{font-size:12px;line-height:1.7;color:#7a938c;max-width:620px;margin:0}
+.al-lab-headright{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:2px}
+.al-lab-switch{display:flex;gap:4px;padding:5px;background:#e5f0eb;border-radius:999px;white-space:nowrap}
+.al-lab-switch button{border:none;background:transparent;color:#6b8880;border-radius:999px;font-weight:800;font-size:12px;padding:10px 18px;display:flex;align-items:center;gap:7px;transition:background .18s,color .18s,box-shadow .18s}
+.al-lab-switch button.is-active{background:#143f3a;color:#fff;box-shadow:0 3px 12px #26483f22}
+.al-lab-button-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.6}
+.al-lab-refresh{background:#fff;border:1px solid #e2eee8;border-radius:14px;height:42px;padding:0 14px;display:flex;align-items:center;gap:7px;color:#436a60;font-weight:800;font-size:11px;transition:background .18s}
+.al-lab-refresh:hover{background:#e7f6ef}.al-lab-refresh:disabled{opacity:.5;cursor:wait}
+.al-lab-model-strip{display:flex;align-items:center;gap:17px;border:1px solid #e6eee9;background:#fff;border-radius:23px;padding:17px 21px;margin-bottom:17px;box-shadow:0 4px 16px #5d867a0a}
+.al-lab-model-symbol{width:48px;height:48px;display:grid;place-items:center;background:#e6f8f0;color:#149a87;border-radius:16px;flex:none}
+.al-lab-model-details{min-width:0;flex:1}
+.al-lab-model-details>span{display:block;font-size:9px;font-weight:850;color:#91aaa2;letter-spacing:.13em;margin-bottom:4px}
+.al-lab-model-details strong{display:block;font-size:16px;letter-spacing:-.03em;color:#213d35}
+.al-lab-model-details p{font-size:11px;color:#839991;margin:4px 0 0}
+.al-lab-model-feature{display:flex;align-items:center;gap:7px;font-weight:700;font-size:10px;color:#66897e;background:#f4f9f5;padding:11px 13px;border-radius:12px;max-width:290px}
+.al-lab-model-feature svg{flex-shrink:0}
+.al-lab-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:18px}
+.al-lab-stat{border:1px solid #e6eee9;background:#fff;border-radius:22px;padding:17px 20px 16px;min-width:0;box-shadow:0 4px 16px #5d867a08}
+.al-lab-stat-header{display:flex;justify-content:space-between;align-items:center;gap:5px}
+.al-lab-stat-header>span{font-weight:850;font-size:9px;line-height:1.5;letter-spacing:.1em;color:#91a7a0}
+.al-lab-stat-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;background:#e7f7ee;color:#169e8b;flex:none}
+.al-lab-stat-violet .al-lab-stat-icon{background:#f1eaff;color:#9475ca}
+.al-lab-stat-amber .al-lab-stat-icon{background:#fff3e6;color:#e49b62}
+.al-lab-stat-blue .al-lab-stat-icon{background:#e9f5fb;color:#71a4c7}
+.al-lab-stat>strong{display:block;font-size:clamp(25px,2.5vw,37px);font-weight:850;line-height:1.12;letter-spacing:-.05em;margin-top:7px;color:#173631;white-space:nowrap}
+.al-lab-stat>small{display:block;font-size:10px;color:#8ca39a;margin-top:7px;line-height:1.4}
+.al-lab-status{display:flex;align-items:center;gap:13px;padding:12px 17px;border:1px solid #f0e6cd;background:#fffaf0;border-radius:16px;margin-bottom:19px;color:#856a37}
+.al-lab-status.is-available{background:#f1fcf5;border-color:#daf1e1;color:#3b8065}
+.al-lab-status.is-error{background:#fff2ef;border-color:#f9dcd2;color:#a45d4a}
+.al-lab-status-icon{width:33px;height:33px;display:grid;place-items:center;border-radius:12px;background:#fff5dd;flex:none}
+.al-lab-status.is-available .al-lab-status-icon{background:#dcf8e8}.al-lab-status.is-error .al-lab-status-icon{background:#ffded6}
+.al-lab-status>div:nth-child(2){min-width:0;flex:1}
+.al-lab-status strong{display:block;font-size:11px;font-weight:850;color:inherit}
+.al-lab-status span{display:block;font-size:10px;line-height:1.55;color:inherit;opacity:.85;margin-top:2px}
+.al-lab-status .al-lab-status-pill{font-size:9px;font-weight:850;letter-spacing:.09em;white-space:nowrap;border:1px solid currentColor;border-radius:999px;padding:7px 10px;margin:0;opacity:.8}
+.al-lab-two-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:17px}
+.al-lab-primary-row{grid-template-columns:minmax(0,1.03fr) minmax(0,1fr)}
+.al-lab-card{border:1px solid #e6eee9;border-radius:25px;background:#fff;box-shadow:0 5px 23px #587c6f0b;padding:22px 24px;min-width:0;display:flex;flex-direction:column;min-height:330px}
+.al-lab-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:15px}
+.al-lab-card-index{display:block;font-size:9px;font-weight:870;letter-spacing:.14em;color:#8ea9a1;margin-bottom:7px}
+.al-lab-card-head h2{font-size:18px;color:#1c3932;font-weight:830;letter-spacing:-.045em;line-height:1.2;margin:0}
+.al-lab-card-head p{font-size:10.5px;color:#8a9f97;line-height:1.55;margin:7px 0 0;max-width:460px}
+.al-lab-card-action{flex-shrink:0}
+.al-lab-composition-body{display:grid;grid-template-columns:minmax(145px,.75fr) minmax(0,1fr);gap:12px;align-items:center;flex:1;min-height:213px}
+.al-lab-donut{width:100%;max-width:230px;aspect-ratio:1;position:relative;display:grid;place-items:center;margin-inline:auto}
+.al-lab-donut>svg{width:100%;height:100%}
+.al-lab-donut-centre{position:absolute;display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none;gap:5px}
+.al-lab-donut-centre strong{font-size:36px;font-weight:870;letter-spacing:-.07em;color:#183530;line-height:1}
+.al-lab-donut-centre span{color:#90a69f;font-size:11px;line-height:1.3}
+.al-lab-profile-picks{display:flex;flex-direction:column;gap:3px;max-height:205px;overflow-y:auto;padding-right:4px}
+.al-lab-cluster-pick{width:100%;display:flex;gap:10px;align-items:center;text-align:left;background:transparent;border:none;padding:9px 9px;border-radius:12px;color:#526e65;transition:background .15s}
+.al-lab-cluster-pick:hover,.al-lab-cluster-pick.is-selected{background:#f2f8f4}
+.al-lab-cluster-dot{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 0 4px #d4e8df55}
+.al-lab-cluster-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:750}
+.al-lab-cluster-pick strong{font-size:11px;color:#183a31;white-space:nowrap}
+.al-lab-muted-legend{display:flex;flex-direction:column;gap:13px}
+.al-lab-muted-legend>span{display:flex;align-items:center;gap:11px;font-size:11px;font-weight:800;color:#5a716b;padding-bottom:10px;border-bottom:1px dashed #e3ede8}
+.al-lab-key{width:8px;height:8px;display:inline-block;border-radius:50%}.al-lab-key-teal{background:#36c6ab}.al-lab-key-amber{background:#efc66b}.al-lab-key-coral{background:#f28b72}
+.al-lab-muted-legend p{font-size:10px;color:#a4b2ac;line-height:1.5;margin:0}
+.al-lab-comp-footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid #eff3f0;padding-top:14px;margin-top:7px;align-items:center}
+.al-lab-comp-footer strong{font-size:10px;font-weight:800;color:#3e655c}.al-lab-comp-footer span{font-size:10px;color:#9aaba4}
+.al-lab-chart-tabs{display:flex;background:#eef4f0;padding:4px;gap:3px;border-radius:999px}
+.al-lab-chart-tabs button{border:0;background:transparent;font-size:10px;font-weight:800;padding:8px 11px;border-radius:999px;color:#7d958b}
+.al-lab-chart-tabs button.is-active{background:#fff;color:#148c7e;box-shadow:0 2px 8px #35594b1c}
+.al-lab-chart-wrap{height:213px;min-width:0;width:100%;margin:auto 0}
+.al-lab-chart-empty{height:213px;min-height:165px;position:relative;overflow:hidden;background:linear-gradient(155deg,#fafcfb,#f5faf7);border:1px solid #eff4f1;border-radius:17px;display:grid;place-items:center;margin:auto 0}
+.al-lab-empty-grid{position:absolute;inset:18px 12px;background-image:linear-gradient(to right,#e7f0ec 1px,transparent 1px),linear-gradient(to bottom,#e7f0ec 1px,transparent 1px);background-size:45px 38px;mask-image:linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent);opacity:.55}
+.al-lab-empty-content{position:relative;z-index:1;display:flex;align-items:center;flex-direction:column;gap:10px;text-align:center;background:#ffffffeb;border:1px solid #e7f0ea;box-shadow:0 7px 24px #58807312;border-radius:16px;padding:16px 20px;width:min(84%,300px)}
+.al-lab-empty-content svg{color:#9bbbaf}.al-lab-empty-content strong{color:#4b7569;font-size:12px;line-height:1.3}.al-lab-empty-content span{color:#91a79e;font-size:10px;line-height:1.55}
+.al-lab-chart-caption{margin-top:15px;display:flex;align-items:center;gap:7px;font-size:10px;color:#79928a;font-weight:750;flex-wrap:wrap}
+.al-lab-colorbar{width:20px;height:4px;border-radius:999px;display:inline-block;flex:none}
+.al-lab-caption-right{margin-left:auto;color:#9badab;font-size:10px;font-weight:600}
+.al-lab-chart-caption>strong{color:#24473d;font-size:13px}
+.al-lab-card-footnote{margin-top:auto;border-top:1px solid #eef3f0;padding-top:13px;display:flex;align-items:flex-start;gap:7px;font-size:10px;line-height:1.6;color:#8b9e98}
+.al-lab-card-footnote svg{flex:none;margin-top:1px;color:#9bb8aa}
+.al-lab-detail-row .al-lab-card{min-height:380px}
+.al-lab-link{display:inline-flex;gap:4px;align-items:center;white-space:nowrap;font-size:11px;color:#139a88!important;font-weight:800}
+.al-lab-profile-focus{display:flex;flex-direction:column;gap:22px;flex:1}
+.al-lab-profile-name{display:flex;gap:13px;align-items:flex-start;background:#f6faf7;border:1px solid #ecf3ed;border-radius:14px;padding:15px}
+.al-lab-large-dot{width:15px;height:15px;border-radius:50%;box-shadow:0 0 0 5px #e2f2e8;flex:none;margin-top:2px}
+.al-lab-profile-name strong{font-size:13px;font-weight:850;color:#1c4638}.al-lab-profile-name p{font-size:11px;line-height:1.5;color:#83a093;margin:5px 0 0}
+.al-lab-feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.al-lab-feature-grid>div{padding:13px 15px;border:1px solid #eaf1ec;border-radius:13px;display:flex;flex-direction:column;gap:7px}
+.al-lab-feature-grid span{font-size:10px;color:#8b9f97}.al-lab-feature-grid strong{font-size:18px;line-height:1;color:#244d40;letter-spacing:-.04em}
+.al-lab-season-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.al-lab-season-row>div{padding:10px 7px;background:#f8f9f4;border-radius:10px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.al-lab-season-row span{font-size:9px;line-height:1.2;color:#8ca295}.al-lab-season-row strong{font-size:13px;color:#2b5845}
+.al-lab-table-wrap{overflow-x:auto;max-width:100%}
+.al-lab-table{width:100%;border-collapse:collapse;text-align:left;font-size:11px;min-width:520px}
+.al-lab-table th{font-size:9px;letter-spacing:.05em;text-transform:uppercase;font-weight:850;color:#a0b0a8;padding:12px 8px;border-bottom:1px solid #e6ede8}
+.al-lab-table td{padding:14px 8px;border-bottom:1px solid #edf2ee;color:#486d60}
+.al-lab-table td:first-child{font-weight:800;color:#26483c;text-transform:capitalize;white-space:nowrap}
+.al-lab-method-dot{display:inline-block;vertical-align:middle;width:6px;height:6px;background:#2bc4a6;border-radius:50%;margin-right:8px}
+.al-lab-robust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:20px}
+.al-lab-robust-grid>div{background:#f4faf6;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:9px}
+.al-lab-robust-grid span{font-size:10px;color:#86a096}.al-lab-robust-grid strong{font-size:22px;color:#2d604d;letter-spacing:-.05em}
+.al-lab-explainers{display:flex;flex-direction:column;gap:12px;margin:4px 0 19px}
+.al-lab-explainers>div{display:flex;align-items:flex-start;gap:10px;color:#657f76;font-size:11px;line-height:1.6}
+.al-lab-explainers p{margin:0}.al-lab-explainer-icon{width:30px;height:30px;border-radius:11px;display:grid;place-items:center;background:#e8f7ef;color:#2aa987;flex:none}
+.al-lab-explainer-icon.coral{background:#fff0e5;color:#e99467}.al-lab-explainer-icon.lilac{background:#f1e9fb;color:#9a79c5}
+.al-lab-methodology{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#153f38;color:#fff!important;border-radius:13px;font-weight:800;font-size:11px;padding:13px 15px;margin-top:auto}
+.al-lab-methodology:hover{background:#206054}
+.al-lab-footer{display:flex;align-items:center;gap:15px;flex-wrap:wrap;border-top:1px solid #dae8df;padding:19px 0 0;color:#90a49c;font-size:10px;line-height:1.5;margin-top:25px}
+.al-lab-footer span,.al-lab-footer a{display:inline-flex;align-items:center;gap:6px}.al-lab-footer a{color:#4f8274}.al-lab-footer span:first-child{margin-right:auto}
+.al-lab button:focus-visible,.al-lab a:focus-visible{outline:3px solid #24b6a4;outline-offset:3px}
+@media(max-width:1180px){.al-lab-pagehead h1{font-size:43px}.al-lab-model-feature{display:none}.al-lab-stat{padding:15px}.al-lab-card{padding:20px}.al-lab-composition-body{grid-template-columns:140px 1fr}.al-lab-stat>strong{font-size:27px}}
+@media(max-width:970px){.al-lab-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.al-lab-two-cols,.al-lab-primary-row{grid-template-columns:1fr}.al-lab-composition-body{grid-template-columns:190px 1fr}.al-lab-chart-wrap,.al-lab-chart-empty{height:235px}.al-lab-pagehead{align-items:flex-start}}
+@media(max-width:670px){.al-lab-pagehead{flex-direction:column;gap:16px}.al-lab-pagehead h1{font-size:36px}.al-lab-headright{width:100%;justify-content:space-between}.al-lab-switch button{padding:10px 14px}.al-lab-model-strip{padding:14px}.al-lab-model-details strong{font-size:14px}.al-lab-model-details p{font-size:10px}.al-lab-stat-grid{gap:9px}.al-lab-stat{border-radius:17px;padding:13px}.al-lab-stat>strong{font-size:25px}.al-lab-stat-header>span{font-size:8px}.al-lab-stat>small{font-size:9px}.al-lab-status{align-items:flex-start}.al-lab-status .al-lab-status-pill{display:none}.al-lab-card{padding:18px;border-radius:20px;min-height:290px}.al-lab-composition-body{grid-template-columns:minmax(120px,.7fr) 1fr}.al-lab-donut{max-width:155px}.al-lab-donut-centre strong{font-size:27px}.al-lab-muted-legend>span{font-size:9px}.al-lab-card-head{flex-wrap:wrap}.al-lab-feature-grid>div{padding:12px}.al-lab-season-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:410px){.al-lab-composition-body{grid-template-columns:1fr}.al-lab-muted-legend{padding-bottom:12px}.al-lab-pagehead h1{font-size:32px}.al-lab-stat>strong{font-size:22px}}
+@media(prefers-reduced-motion:reduce){.al-lab *{animation:none!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+</style>
+</head><body>
+<div class="al-app"><div class="al-frame">
+<aside class="al-sidebar"><div class="al-sidebrand">◎</div><nav class="al-sidenav"><span class="al-navicon">▦</span><span class="al-navicon">♧</span><span class="al-navicon is-active">⚗</span><span class="al-navicon">☷</span><span class="al-navicon">▤</span></nav><span class="al-sidebar-end">IN</span></aside>
+<div class="al-maincolumn"><header class="al-topbar"><div class="al-brand"><span>AeroScope<span>India</span></span><small>ATMOSPHERIC INTELLIGENCE</small></div><div class="al-header-right"><span class="al-era">● HISTORICAL RESEARCH · 2022–2024</span><span class="al-explorelink">Explore atlas ↗</span></div></header>
+<div class="al-content"><div class="al-lab">
+<div class="al-lab-pagehead"><div class="al-lab-heading"><div class="al-lab-eyebrow"><span class="al-lab-pulse"></span>MODEL INTELLIGENCE / UNSUPERVISED LEARNING</div><h1>Model <em>Laboratory.</em></h1><p>Where satellite observations become patterns. Explore K-Means experiments, validation and interpretable aerosol clusters.</p></div><div class="al-lab-headright"><div class="al-lab-switch"><button class="is-active"><span class="al-lab-button-dot"></span>Model A</button><button><span class="al-lab-button-dot"></span>Model B</button></div><button class="al-lab-refresh">↻ Refresh</button></div></div>
+<div class="al-lab-model-strip"><div class="al-lab-model-symbol">⚗</div><div class="al-lab-model-details"><span>GLOBAL INTENSITY · SELECTED RESEARCH EXPERIMENT</span><strong>Broad Aerosol Loading</strong><p>Explore the distribution and variability of historical aerosol loading.</p></div><div class="al-lab-model-feature">☷ &nbsp;Overall AOD statistics · high-AOD frequency</div></div>
+<div class="al-lab-stat-grid"><article class="al-lab-stat"><div class="al-lab-stat-header"><span>SELECTED CLUSTER COUNT</span><div class="al-lab-stat-icon">▦</div></div><strong>K = 4</strong><small>Configured research model</small></article><article class="al-lab-stat al-lab-stat-violet"><div class="al-lab-stat-header"><span>SILHOUETTE SCORE</span><div class="al-lab-stat-icon">◔</div></div><strong>—</strong><small>Higher suggests better separation</small></article><article class="al-lab-stat al-lab-stat-amber"><div class="al-lab-stat-header"><span>DAVIES–BOULDIN</span><div class="al-lab-stat-icon">▥</div></div><strong>—</strong><small>Lower generally indicates better clustering</small></article><article class="al-lab-stat al-lab-stat-blue"><div class="al-lab-stat-header"><span>PCA EXPLAINED VARIANCE</span><div class="al-lab-stat-icon">✧</div></div><strong>—</strong><small>First two principal components</small></article></div>
+<div class="al-lab-status"><div class="al-lab-status-icon">♙</div><div><strong>Research output restricted</strong><span>Public deployment does not include protected research results. The approved local backend provides the analysis.</span></div><span class="al-lab-status-pill">HISTORICAL · 2022–2024</span></div>
+<div class="al-lab-two-cols al-lab-primary-row">
+<section class="al-lab-card al-lab-composition"><div class="al-lab-card-head"><div><span class="al-lab-card-index">01 / CLUSTER ANATOMY</span><h2>Inside the clusters</h2><p>Relative share of model-eligible satellite grid cells.</p></div></div><div class="al-lab-composition-body"><div class="al-lab-donut"><svg viewBox="0 0 180 180"><circle cx="90" cy="90" r="63" stroke="#eaf2ee" stroke-width="15" fill="none"/><circle cx="90" cy="90" r="63" stroke="#bfe9d9" stroke-width="3" fill="none" stroke-dasharray="3 9"/></svg><div class="al-lab-donut-centre"><strong>—</strong><span>identified<br/>clusters</span></div></div><div class="al-lab-muted-legend"><span><i class="al-lab-key al-lab-key-teal"></i>Cluster profiles</span><span><i class="al-lab-key al-lab-key-amber"></i>AOD variability</span><span><i class="al-lab-key al-lab-key-coral"></i>Regional patterns</span><p>Cluster proportions appear when research results are accessible.</p></div></div><div class="al-lab-comp-footer"><strong>Model-dependent cluster composition</strong><span>No simulated proportions or assignments</span></div></section>
+<section class="al-lab-card"><div class="al-lab-card-head"><div><span class="al-lab-card-index">02 / MODEL SELECTION</span><h2>Clustering performance</h2><p>Explore separation and compactness across evaluated K values.</p></div><div class="al-lab-chart-tabs"><button class="is-active">Silhouette</button><button>DBI</button></div></div><div class="al-lab-chart-empty"><div class="al-lab-empty-grid"></div><div class="al-lab-empty-content"><strong>Performance metrics are restricted</strong><span>The chart will use verified values from the research API when available.</span></div></div><div class="al-lab-chart-caption"><span class="al-lab-colorbar" style="background:#14afa5"></span>Silhouette coefficient <span class="al-lab-caption-right">No unverified scores displayed</span></div></section></div>
+<div class="al-lab-two-cols"><section class="al-lab-card"><div class="al-lab-card-head"><div><span class="al-lab-card-index">03 / OPTIMIZATION</span><h2>Elbow · within-cluster error</h2><p>WCSS across K. A decreasing curve alone does not prove an optimal solution.</p></div></div><div class="al-lab-chart-empty"><div class="al-lab-empty-grid"></div><div class="al-lab-empty-content"><strong>WCSS results unavailable</strong><span>Actual experimental curves appear with local research output.</span></div></div><div class="al-lab-card-footnote">ⓘ &nbsp;WCSS magnitudes should not be compared directly across different model feature spaces.</div></section><section class="al-lab-card"><div class="al-lab-card-head"><div><span class="al-lab-card-index">04 / DIMENSIONALITY REDUCTION</span><h2>PCA · cluster projection</h2><p>PC1 and PC2 positions of cluster centroids, not individual locations.</p></div></div><div class="al-lab-chart-empty"><div class="al-lab-empty-grid"></div><div class="al-lab-empty-content"><strong>PCA centroids unavailable</strong><span>PC1/PC2 visualization appears when permitted data is present.</span></div></div><div class="al-lab-chart-caption"><span>Explained variance</span><strong>—</strong><span class="al-lab-caption-right">Two principal components</span></div></section></div>
+<div class="al-lab-two-cols al-lab-bottom-row"><section class="al-lab-card"><div class="al-lab-card-head"><div><span class="al-lab-card-index">05 / INTERPRETATION</span><h2>Cluster profile library</h2><p>Explore original-unit features for identified groups.</p></div></div><div class="al-lab-chart-empty"><div class="al-lab-empty-grid"></div><div class="al-lab-empty-content"><strong>Cluster profiles unavailable</strong><span>Detailed cluster summaries will appear with research data.</span></div></div></section><section class="al-lab-card"><div class="al-lab-card-head"><div><span class="al-lab-card-index">06 / METHOD COMPARISON</span><h2>Algorithm comparison</h2><p>Distance-aware evaluation across saved clustering methods.</p></div></div><div class="al-lab-chart-empty"><div class="al-lab-empty-grid"></div><div class="al-lab-empty-content"><strong>Comparisons restricted</strong><span>No simulated scientific results are displayed.</span></div></div></section></div>
+<footer class="al-lab-footer"><span>INSAT-3D · 2022–2024 · MOSDAC/SAC/ISRO</span><span>Historical AOD · no live pollution readings</span></footer>
+</div></div></div></div></div>
+</body></html>
