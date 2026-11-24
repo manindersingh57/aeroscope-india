@@ -7,7 +7,7 @@ import {
   ShieldAlert, SlidersHorizontal, Sparkles,
 } from 'lucide-react'
 import {
-  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart,
+  CartesianGrid, Cell, LabelList, Line, LineChart,
   ReferenceLine, ResponsiveContainer, Scatter, ScatterChart,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
